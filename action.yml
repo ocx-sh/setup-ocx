@@ -1,0 +1,29 @@
+name: 'Setup OCX'
+description: 'Install the OCX package manager'
+author: 'ocx-sh'
+branding:
+  icon: 'package'
+  color: 'blue'
+inputs:
+  version:
+    description: 'OCX version to install (e.g., "latest", "0.2.0")'
+    required: false
+    default: 'latest'
+  github-token:
+    description: 'GitHub token for API requests and release downloads'
+    required: false
+    default: '${{ github.token }}'
+  libc:
+    description: 'Linux C library variant ("gnu" or "musl"). Auto-detected if not specified.'
+    required: false
+    default: ''
+outputs:
+  version:
+    description: 'The installed OCX version'
+  ocx-path:
+    description: 'Path to the OCX binary directory'
+  cache-hit:
+    description: 'Whether the OCX binary was restored from cache'
+runs:
+  using: node24
+  main: dist/setup/index.js

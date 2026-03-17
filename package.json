@@ -1,0 +1,23 @@
+{
+  "name": "setup-ocx",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GitHub Action to install the OCX package manager",
+  "scripts": {
+    "build": "bun scripts/build.ts",
+    "test": "bun test"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "@actions/core": "^3.0.0",
+    "@actions/http-client": "^4.0.0",
+    "@actions/tool-cache": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "esbuild": "^0.27.4",
+    "typescript": "^5.9.3"
+  }
+}
