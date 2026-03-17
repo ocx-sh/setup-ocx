@@ -13,7 +13,7 @@
   "dependencies": {
     "@actions/core": "^1.11.1",
     "@actions/http-client": "^2.2.3",
-    "@actions/tool-cache": "^2.0.2"
+    "@actions/tool-cache": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
