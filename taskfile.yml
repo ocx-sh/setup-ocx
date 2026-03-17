@@ -10,11 +10,19 @@ vars:
   OCX_EXEC: 'ocx exec nodejs:{{.OCX_NODE_VERSION}} bun:{{.OCX_BUN_VERSION}} --'
 
 tasks:
-  ocx:update:
+  update:ocx-tools:
     desc: Update OCX index
     cmds:
       - rm -rf {{.OCX_INDEX}}
       - ocx index update nodejs:{{.OCX_NODE_VERSION}} bun:{{.OCX_BUN_VERSION}}
+  update:bun-packages:
+    desc: Update package versions in package.json
+    cmd: '{{.OCX_EXEC}} bun update --latest'
+  update:
+    desc: Update OCX index and package versions
+    cmds:
+      - task: update:ocx-tools
+      - task: update:bun-packages
 
   build:
     desc: Build the dist bundle
