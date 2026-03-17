@@ -1,0 +1,44 @@
+name: Verify Deep
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+jobs:
+  integration:
+    name: Integration (${{ matrix.os }}${{ matrix.libc && format(' {0}', matrix.libc) || '' }})
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+          - os: ubuntu-latest
+            libc: musl
+          - os: macos-latest
+          - os: windows-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Setup OCX
+        id: setup
+        uses: ./
+        with:
+          version: latest
+          libc: ${{ matrix.libc || '' }}
+      - name: Verify installation
+        run: ocx info
+      - name: Verify outputs
+        shell: bash
+        env:
+          VERSION: ${{ steps.setup.outputs.version }}
+          OCX_PATH: ${{ steps.setup.outputs.ocx-path }}
+          CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}
+        run: |
+          echo "version=$VERSION"
+          echo "ocx-path=$OCX_PATH"
+          echo "cache-hit=$CACHE_HIT"
+          test -n "$VERSION"
+          test -n "$OCX_PATH"

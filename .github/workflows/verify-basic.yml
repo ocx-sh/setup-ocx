@@ -1,0 +1,49 @@
+name: Verify Basic
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  dogfood:
+    name: Dogfood
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Setup OCX
+        id: setup
+        uses: ./
+      - uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2
+      - run: task install
+      - run: task check
+      - name: Verify outputs
+        env:
+          VERSION: ${{ steps.setup.outputs.version }}
+          OCX_PATH: ${{ steps.setup.outputs.ocx-path }}
+        run: |
+          test -n "$VERSION"
+          test -n "$OCX_PATH"
+
+  integration-musl:
+    name: Integration (musl)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Setup OCX
+        id: setup
+        uses: ./
+        with:
+          libc: musl
+      - run: ocx info
+      - name: Verify outputs
+        env:
+          VERSION: ${{ steps.setup.outputs.version }}
+          OCX_PATH: ${{ steps.setup.outputs.ocx-path }}
+        run: |
+          test -n "$VERSION"
+          test -n "$OCX_PATH"
