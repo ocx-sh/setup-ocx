@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions: {}
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        id: changelog
+        uses: orhun/git-cliff-action@4a4a951bc43fabb5eb1714edabd6bde6974a9c08 # v4
+        with:
+          args: --latest --strip header
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+
+      - name: Create release
+        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2
+        with:
+          body: ${{ steps.changelog.outputs.content }}
+          make_latest: true
+
+      - name: Update major version tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          major="${TAG%%.*}"
+          git tag -f "$major"
+          git push origin "$major" --force

@@ -50,3 +50,22 @@ tasks:
   install:
     desc: Install dependencies
     cmd: '{{.OCX_EXEC}} bun install'
+
+  release:
+    desc: Generate CHANGELOG.md and create a version tag
+    preconditions:
+      - sh: git diff --quiet && git diff --cached --quiet
+        msg: Working tree must be clean
+    vars:
+      VERSION:
+        sh: git-cliff --bumped-version
+    cmds:
+      - 'git-cliff --bump --output CHANGELOG.md'
+      - 'git add CHANGELOG.md'
+      - 'git commit -m "release: {{.VERSION}}"'
+      - 'git tag {{.VERSION}}'
+      - |
+        echo ""
+        echo "Release prepared ({{.VERSION}}). Review changes, then:"
+        echo "  git push origin main"
+        echo "  git push origin {{.VERSION}}"

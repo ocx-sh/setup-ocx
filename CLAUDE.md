@@ -43,6 +43,25 @@ Tests live in `tests/` and use `bun:test` with its built-in mocking (`mock.modul
 bun test tests/version.test.ts
 ```
 
+## Commits
+
+Use [Conventional Commits](https://www.conventionalcommits.org/). git-cliff uses the commit type to auto-detect the next version and generate the changelog.
+
+| Prefix | Purpose | Version bump |
+|---|---|---|
+| `feat:` | New feature | minor |
+| `fix:` | Bug fix | patch |
+| `feat!:` / `fix!:` / `BREAKING CHANGE` | Breaking change | major |
+| `perf:` | Performance improvement | patch |
+| `refactor:` | Code restructuring | — |
+| `docs:` | Documentation | — |
+| `test:` | Tests | — |
+| `ci:` | CI/CD changes | — |
+| `build:` | Build system / dependencies | — |
+| `chore:` | Maintenance | — |
+
+Scopes are optional: `feat(download): add retry logic`.
+
 ## Updating Docs
 
 When changing inputs/outputs (`action.yml`), tasks (`taskfile.yml`), source files, build tooling, or prerequisites, keep `README.md` and `CONTRIBUTING.md` in sync per the rules in `.claude/rules/update-docs.md`.
