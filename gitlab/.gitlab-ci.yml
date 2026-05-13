@@ -1,0 +1,58 @@
+# GitLab CI pipeline for the setup-ocx Function.
+# Triggered on the gitlab.com mirror project (gitlab.com/ocx-sh/setup-ocx).
+# The mirror is produced by the GitHub release workflow in this repo
+# (.github/workflows/release.yml → mirror-gitlab job).
+
+stages: [build, publish, release]
+
+variables:
+  IMAGE: $CI_REGISTRY_IMAGE/setup-ocx
+
+# Build the OCI image for the function via GitLab's builtin function.
+# This packages install.sh + entrypoint.sh + func.yml from the gitlab/
+# subdirectory of the mirror (which the export script promotes to the
+# project root).
+build:
+  stage: build
+  rules:
+    - if: $CI_COMMIT_TAG
+  run:
+    - name: build-image
+      function: builtin://function/oci/build
+      inputs:
+        context: .
+        dockerfile: Dockerfile
+        tags:
+          - "$IMAGE:$CI_COMMIT_TAG"
+          - "$IMAGE:latest"
+
+publish:
+  stage: publish
+  needs: [build]
+  rules:
+    - if: $CI_COMMIT_TAG
+  run:
+    - name: login
+      function: builtin://function/oci/login
+      inputs:
+        registry: $CI_REGISTRY
+        username: $CI_REGISTRY_USER
+        password: $CI_REGISTRY_PASSWORD
+    - name: publish-image
+      function: builtin://function/oci/publish
+      inputs:
+        image: "$IMAGE:$CI_COMMIT_TAG"
+
+# `release:` keyword creates the GitLab Release entity, which is what
+# CI/CD Catalog uses to index a new version of the component.
+release:
+  stage: release
+  needs: [publish]
+  rules:
+    - if: $CI_COMMIT_TAG
+  release:
+    tag_name: $CI_COMMIT_TAG
+    description: "OCX setup function $CI_COMMIT_TAG. Source: https://github.com/ocx-sh/setup-ocx/releases/tag/$CI_COMMIT_TAG"
+    ref: $CI_COMMIT_SHA
+  script:
+    - echo "Releasing $CI_COMMIT_TAG"

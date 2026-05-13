@@ -1,0 +1,47 @@
+spec:
+  inputs:
+    version:
+      description: 'OCX version to install (e.g. "0.5.0", "latest").'
+      default: 'latest'
+      type: string
+    libc:
+      description: 'Linux C library variant ("gnu" or "musl"). Auto-detected when empty.'
+      default: ''
+      type: string
+    base_url:
+      description: 'Override release-asset base URL. Maps to OCX_INSTALL_BASE_URL.'
+      default: ''
+      type: string
+    api_url:
+      description: 'Override "latest" lookup URL. Maps to OCX_INSTALL_API_URL.'
+      default: ''
+      type: string
+    format_url:
+      description: 'URL template with {version},{tag},{target},{ext} placeholders.'
+      default: ''
+      type: string
+    checksum_format_url:
+      description: 'Checksum-file URL template (same placeholders).'
+      default: ''
+      type: string
+    repo:
+      description: 'GitHub owner/repo. Maps to OCX_INSTALL_REPO.'
+      default: 'ocx-sh/ocx'
+      type: string
+    skip_bootstrap:
+      description: 'Skip "ocx --remote install" bootstrap (offline / air-gapped).'
+      default: false
+      type: boolean
+    github_token:
+      description: 'Token forwarded as GITHUB_TOKEN for API + private releases.'
+      default: ''
+      type: string
+  outputs:
+    version:
+      description: 'Resolved OCX version that was installed.'
+    path:
+      description: 'Absolute path to the OCX bin directory.'
+---
+exec:
+  command: ['./entrypoint.sh']
+  work_dir: '${{ func_dir }}'

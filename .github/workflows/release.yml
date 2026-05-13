@@ -41,3 +41,85 @@ jobs:
           major="${TAG%%.*}"
           git tag -f "$major"
           git push origin "$major" --force
+
+  publish-installers:
+    name: Publish installers to setup.ocx.sh
+    needs: [release]
+    runs-on: ubuntu-latest
+    environment: setup.ocx.sh
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Configure SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.SETUP_OCX_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H setup.ocx.sh >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Publish
+        env:
+          TAG: ${{ github.ref_name }}
+          SSH_KEY: /home/runner/.ssh/id_ed25519
+          SETUP_OCX_HOST: setup.ocx.sh
+        run: |
+          VERSION="${TAG#v}" scripts/publish-installers.sh
+
+  mirror-gitlab:
+    name: Mirror to gitlab.com/ocx-sh/setup-ocx
+    needs: [release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Build GitLab export tree
+        run: scripts/build-gitlab-export.sh /tmp/gitlab-export
+
+      - name: Mirror push (single commit per release, no force)
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_MIRROR_TOKEN }}
+          GITLAB_PROJECT: ocx-sh/setup-ocx
+          GITLAB_HOST: gitlab.com
+          TAG: ${{ github.ref_name }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          MIRROR_DIR=/tmp/gitlab-mirror
+          git clone --depth 1 \
+            "https://oauth2:${GITLAB_TOKEN}@${GITLAB_HOST}/${GITLAB_PROJECT}.git" \
+            "$MIRROR_DIR" || {
+            # Empty repo: init fresh
+            mkdir -p "$MIRROR_DIR"
+            cd "$MIRROR_DIR"
+            git init -q -b main
+            git remote add origin "https://oauth2:${GITLAB_TOKEN}@${GITLAB_HOST}/${GITLAB_PROJECT}.git"
+          }
+
+          # Sync export over working tree, preserving .git
+          rsync -a --delete --exclude=.git/ /tmp/gitlab-export/ "$MIRROR_DIR/"
+
+          cd "$MIRROR_DIR"
+          git config user.name 'ocx-sh-bot'
+          git config user.email 'bot@ocx.sh'
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No changes for ${TAG}; skipping commit"
+          else
+            git commit -m "release: ${TAG}
+
+          Mirror of ocx-sh/setup-ocx@${GITHUB_SHA}"
+          fi
+
+          git tag -f "${TAG}"
+          git push origin main
+          git push origin "${TAG}"

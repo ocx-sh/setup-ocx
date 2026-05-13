@@ -1,0 +1,172 @@
+name: Verify Installers
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to test against (e.g., v0.5.0). Defaults to latest.'
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Run shellcheck on installer + GLF wrapper
+        run: |
+          shellcheck sh/install.sh
+          if [ -f gitlab/entrypoint.sh ]; then shellcheck gitlab/entrypoint.sh; fi
+          if [ -f scripts/build-gitlab-export.sh ]; then shellcheck scripts/build-gitlab-export.sh; fi
+          if [ -f scripts/publish-installers.sh ]; then shellcheck scripts/publish-installers.sh; fi
+
+  drift-check:
+    name: GLF install.sh drift check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Diff sh/install.sh against gitlab/install.sh
+        run: |
+          if [ ! -f gitlab/install.sh ]; then
+            echo "::warning::gitlab/install.sh not present yet; skipping drift check"
+            exit 0
+          fi
+          diff -q sh/install.sh gitlab/install.sh || {
+            echo "::error::gitlab/install.sh diverges from sh/install.sh — run 'task sync:gitlab'"
+            diff -u sh/install.sh gitlab/install.sh || true
+            exit 1
+          }
+
+  bats-env-knobs:
+    name: Bats (env knobs, fixture HTTP)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Install bats + xz-utils
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats xz-utils python3
+      - name: Run bats
+        run: bats tests/install/env-knobs.bats
+
+  install-sh-ubuntu:
+    name: install.sh (Ubuntu, real release)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Run install.sh
+        run: |
+          version_arg=""
+          if [ -n "${{ inputs.release_tag }}" ]; then
+            version_arg="--version $(echo '${{ inputs.release_tag }}' | sed 's/^v//')"
+          fi
+          OCX_NO_MODIFY_PATH=1 bash sh/install.sh $version_arg
+      - name: Verify installation
+        run: |
+          export PATH="$HOME/.ocx/symlinks/ocx.sh/ocx/current/bin:$PATH"
+          ocx version
+          test -f "$HOME/.ocx/env"
+
+  install-sh-alpine:
+    name: install.sh (Alpine, real release)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Run in Alpine container
+        run: |
+          version_arg=""
+          if [ -n "${{ inputs.release_tag }}" ]; then
+            version_arg="--version $(echo '${{ inputs.release_tag }}' | sed 's/^v//')"
+          fi
+          docker run --rm \
+            -v "$PWD/sh/install.sh:/install.sh" \
+            -e OCX_NO_MODIFY_PATH=1 \
+            alpine:latest sh -c "
+              apk add --no-cache curl tar xz &&
+              sh /install.sh $version_arg &&
+              export PATH=\"\$HOME/.ocx/symlinks/ocx.sh/ocx/current/bin:\$PATH\" &&
+              ocx version &&
+              test -f \"\$HOME/.ocx/env\"
+            "
+
+  install-sh-macos:
+    name: install.sh (macOS, real release)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Run install.sh
+        run: |
+          version_arg=""
+          if [ -n "${{ inputs.release_tag }}" ]; then
+            version_arg="--version $(echo '${{ inputs.release_tag }}' | sed 's/^v//')"
+          fi
+          OCX_NO_MODIFY_PATH=1 bash sh/install.sh $version_arg
+      - name: Verify installation
+        run: |
+          export PATH="$HOME/.ocx/symlinks/ocx.sh/ocx/current/bin:$PATH"
+          ocx version
+          test -f "$HOME/.ocx/env"
+
+  install-sh-print-path:
+    name: install.sh PRINT_PATH stdout discipline
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Capture bin dir from stdout
+        run: |
+          version_arg=""
+          if [ -n "${{ inputs.release_tag }}" ]; then
+            version_arg="--version $(echo '${{ inputs.release_tag }}' | sed 's/^v//')"
+          fi
+          BIN_DIR=$(OCX_NO_MODIFY_PATH=1 OCX_INSTALL_PRINT_PATH=1 OCX_INSTALL_QUIET=1 \
+            bash sh/install.sh $version_arg | tail -n1)
+          echo "Captured: $BIN_DIR"
+          test -d "$BIN_DIR"
+          test -x "$BIN_DIR/ocx"
+          "$BIN_DIR/ocx" version
+
+  install-ps1-windows:
+    name: install.ps1 (Windows, real release)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Run install.ps1
+        shell: pwsh
+        run: |
+          $env:OCX_NO_MODIFY_PATH = '1'
+          $versionArg = @()
+          if ('${{ inputs.release_tag }}') {
+            $v = '${{ inputs.release_tag }}' -replace '^v', ''
+            $versionArg = @('-Version', $v)
+          }
+          & ./pwsh/install.ps1 @versionArg
+      - name: Verify installation
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:USERPROFILE\.ocx\symlinks\ocx.sh\ocx\current\bin;$env:PATH"
+          ocx version
+          Test-Path "$env:USERPROFILE\.ocx\env.ps1"
+
+  pester-knobs-windows:
+    name: Pester (env knobs, Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Install Pester 5
+        shell: pwsh
+        run: Install-Module -Name Pester -RequiredVersion 5.5.0 -Force -Scope CurrentUser -SkipPublisherCheck
+      - name: Run Pester
+        shell: pwsh
+        run: |
+          Import-Module Pester
+          $cfg = New-PesterConfiguration
+          $cfg.Run.Path = 'tests/install/ps1'
+          $cfg.Run.Exit = $true
+          $cfg.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $cfg

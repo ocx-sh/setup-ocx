@@ -52,6 +52,46 @@ tasks:
     desc: Install dependencies
     cmd: '{{.OCX_EXEC}} bun install'
 
+  lint:sh:
+    desc: ShellCheck the POSIX installer + helper scripts
+    cmds:
+      - shellcheck sh/install.sh
+      - shellcheck gitlab/entrypoint.sh
+      - shellcheck scripts/build-gitlab-export.sh scripts/publish-installers.sh
+
+  lint:ps1:
+    desc: Run PSScriptAnalyzer over the PowerShell installer
+    cmd: pwsh -NoProfile -Command 'Invoke-ScriptAnalyzer -Path pwsh/install.ps1 -Severity Warning,Error -EnableExit'
+
+  test:install:sh:
+    desc: Run Bats tests against fixture HTTP server (env knobs, exit codes)
+    cmd: bats tests/install/env-knobs.bats
+
+  test:install:ps1:
+    desc: Run Pester tests against fixture HTTP server (Windows / pwsh)
+    cmd: |
+      pwsh -NoProfile -Command '
+        Import-Module Pester
+        $cfg = New-PesterConfiguration
+        $cfg.Run.Path = "tests/install/ps1"
+        Invoke-Pester -Configuration $cfg
+      '
+
+  sync:gitlab:
+    desc: Copy sh/install.sh into gitlab/install.sh (drift-checked in CI)
+    cmds:
+      - cp sh/install.sh gitlab/install.sh
+      - chmod +x gitlab/install.sh
+      - diff -q sh/install.sh gitlab/install.sh
+
+  publish:installers:dry-run:
+    desc: Dry-run publish installers (validates rsync flags + paths)
+    vars:
+      VERSION:
+        sh: '{{.OCX_EXEC}} git-cliff --bumped-version 2>/dev/null | sed "s/^v//" || echo "0.0.0-dev"'
+    cmds:
+      - DRY_RUN=1 VERSION={{.VERSION}} SSH_KEY=/dev/null scripts/publish-installers.sh || true
+
   release:
     desc: Generate CHANGELOG.md and create a version tag
     preconditions:
