@@ -7,6 +7,7 @@
 **GitHub Action to install the [OCX](https://github.com/ocx-sh/ocx) package manager**
 
 [![CI][ci-badge]][ci]
+[![Coverage][codecov-badge]][codecov]
 [![License][license-badge]][license]
 
 </div>
@@ -26,27 +27,27 @@ every locked tool on `PATH` — subsequent steps can invoke `bun`, `node`,
 
 ### Inputs
 
-| Input | Description | Default |
-|-------|-------------|---------|
-| `version` | OCX version to install (`"latest"` or exact like `"0.3.1"`) | `latest` |
-| `github-token` | GitHub token for API requests and release downloads | `${{ github.token }}` |
-| `libc` | Linux C library variant (`"gnu"` or `"musl"`). Auto-detected if not set. | |
-| `toolchain` | Path to the project `ocx.toml` (relative to `working-directory`). Set to `''` to disable toolchain auto-load. | `ocx.toml` |
-| `working-directory` | Directory used to resolve `toolchain` and invoke ocx. | `${{ github.workspace }}` |
-| `groups` | Comma-separated list of toolchain groups to pre-warm via `ocx pull -g`. Empty pulls every entry from `ocx.lock`. | |
-| `cache` | Cache the OCX object store (`$OCX_HOME/{blobs,layers,packages,tags}`) and the ocx binary itself across runs. | `true` |
-| `cache-suffix` | Extra string appended to cache keys for manual busting. | |
-| `ocx-home` | Overrides `$OCX_HOME`. | `~/.ocx` |
+| Input               | Description                                                                                                      | Default                   |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `version`           | OCX version to install (`"latest"` or exact like `"0.3.1"`)                                                      | `latest`                  |
+| `github-token`      | GitHub token for API requests and release downloads                                                              | `${{ github.token }}`     |
+| `libc`              | Linux C library variant (`"gnu"` or `"musl"`). Auto-detected if not set.                                         |                           |
+| `toolchain`         | Path to the project `ocx.toml` (relative to `working-directory`). Set to `''` to disable toolchain auto-load.    | `ocx.toml`                |
+| `working-directory` | Directory used to resolve `toolchain` and invoke ocx.                                                            | `${{ github.workspace }}` |
+| `groups`            | Comma-separated list of toolchain groups to pre-warm via `ocx pull -g`. Empty pulls every entry from `ocx.lock`. |                           |
+| `cache`             | Cache the OCX object store (`$OCX_HOME/{blobs,layers,packages,tags}`) and the ocx binary itself across runs.     | `true`                    |
+| `cache-suffix`      | Extra string appended to cache keys for manual busting.                                                          |                           |
+| `ocx-home`          | Overrides `$OCX_HOME`.                                                                                           | `~/.ocx`                  |
 
 ### Outputs
 
-| Output | Description |
-|--------|-------------|
-| `version` | The installed OCX version |
-| `ocx-path` | Path to the OCX binary directory |
-| `cache-hit` | Whether the OCX binary was restored from cache |
-| `toolchain-loaded` | Whether a project toolchain was found and activated (`"true"` / `"false"`) |
-| `toolchain-cache-hit` | Whether the OCX object store was restored from cache for this toolchain |
+| Output                | Description                                                                |
+| --------------------- | -------------------------------------------------------------------------- |
+| `version`             | The installed OCX version                                                  |
+| `ocx-path`            | Path to the OCX binary directory                                           |
+| `cache-hit`           | Whether the OCX binary was restored from cache                             |
+| `toolchain-loaded`    | Whether a project toolchain was found and activated (`"true"` / `"false"`) |
+| `toolchain-cache-hit` | Whether the OCX object store was restored from cache for this toolchain    |
 
 ### Examples
 
@@ -58,7 +59,7 @@ Commit `ocx.toml` + `ocx.lock` to the repo, then:
 steps:
   - uses: actions/checkout@v4
   - uses: ocx-sh/setup-ocx@v1
-  - run: bun install      # tools from ocx.toml are on PATH automatically
+  - run: bun install # tools from ocx.toml are on PATH automatically
   - run: bun test
 ```
 
@@ -68,7 +69,7 @@ steps:
 steps:
   - uses: ocx-sh/setup-ocx@v1
     with:
-      toolchain: ''       # explicit opt-out — only the ocx binary is installed
+      toolchain: "" # explicit opt-out — only the ocx binary is installed
   - run: ocx run nodejs:24 -- node --version
 ```
 
@@ -78,7 +79,7 @@ steps:
 steps:
   - uses: ocx-sh/setup-ocx@v1
     with:
-      version: '0.3.1'
+      version: "0.3.1"
       groups: ci
 ```
 
@@ -140,7 +141,10 @@ task check          # test + build + verify dist
 setup-ocx is licensed under the [Apache License, Version 2.0][license].
 
 <!-- badges -->
+
 [ci]: https://github.com/ocx-sh/setup-ocx/actions/workflows/verify-basic.yml
 [ci-badge]: https://github.com/ocx-sh/setup-ocx/actions/workflows/verify-basic.yml/badge.svg
+[codecov]: https://codecov.io/gh/ocx-sh/setup-ocx
+[codecov-badge]: https://codecov.io/gh/ocx-sh/setup-ocx/branch/main/graph/badge.svg
 [license]: LICENSE
 [license-badge]: https://img.shields.io/badge/license-Apache--2.0-blue.svg

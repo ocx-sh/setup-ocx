@@ -1,79 +1,35 @@
-import { describe, test, expect, mock, beforeEach } from "bun:test";
-
-const infoMock = mock(() => {});
-const warningMock = mock(() => {});
-
-mock.module("@actions/core", () => ({
-  info: infoMock,
-  debug: mock(() => {}),
-  warning: warningMock,
-  getInput: mock(() => ""),
-  getBooleanInput: mock(() => false),
-  setOutput: mock(() => {}),
-  setFailed: mock(() => {}),
-  addPath: mock(() => {}),
-  exportVariable: mock(() => {}),
-  isDebug: mock(() => false),
-  saveState: mock(() => {}),
-  group: mock(async (_name: string, fn: () => Promise<unknown>) => fn()),
-  summary: {
-    addHeading: mock(function (this: unknown) { return this; }),
-    addTable: mock(function (this: unknown) { return this; }),
-    write: mock(() => Promise.resolve({ filePath: "" })),
-  },
-}));
-
-const getJsonMock = mock(() =>
-  Promise.resolve({
-    statusCode: 200,
-    result: { tag_name: "v0.2.0" },
-    headers: {},
-  }),
-);
-
-mock.module("@actions/http-client", () => ({
-  HttpClient: class MockHttpClient {
-    getJson = getJsonMock;
-  },
-}));
-
-const { resolveVersion } = await import("../src/version");
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { coreMocks, httpMocks, resetMocks } from "./setup-mocks.js";
+import { resolveVersion } from "../src/version.js";
 
 describe("resolveVersion", () => {
   beforeEach(() => {
-    getJsonMock.mockClear();
-    infoMock.mockClear();
-    warningMock.mockClear();
-    // Restore the default success response between tests.
-    getJsonMock.mockImplementation(() =>
-      Promise.resolve({
-        statusCode: 200,
-        result: { tag_name: "v0.2.0" },
-        headers: {},
-      }),
-    );
+    resetMocks();
+  });
+  afterEach(() => {
+    mock.restore();
   });
 
   test("returns exact version unchanged", async () => {
     expect(await resolveVersion("0.2.0", "")).toBe("0.2.0");
-    expect(getJsonMock).not.toHaveBeenCalled();
+    expect(httpMocks.getJson).not.toHaveBeenCalled();
   });
 
   test("strips v prefix from exact version", async () => {
     expect(await resolveVersion("v0.2.0", "")).toBe("0.2.0");
-    expect(getJsonMock).not.toHaveBeenCalled();
+    expect(httpMocks.getJson).not.toHaveBeenCalled();
   });
 
   test("resolves 'latest' via GitHub API in a single attempt on success", async () => {
     const version = await resolveVersion("latest", "test-token");
     expect(version).toBe("0.2.0");
-    expect(getJsonMock).toHaveBeenCalledTimes(1);
-    expect(warningMock).not.toHaveBeenCalled();
+    expect(httpMocks.getJson).toHaveBeenCalledTimes(1);
+    expect(coreMocks.warning).not.toHaveBeenCalled();
   });
 
   test("retries on transient HTTP 503 then succeeds", async () => {
     let attempt = 0;
-    getJsonMock.mockImplementation(() => {
+    httpMocks.getJson.mockImplementation(() => {
       attempt++;
       if (attempt < 2) {
         return Promise.resolve({ statusCode: 503, result: null, headers: {} });
@@ -85,13 +41,13 @@ describe("resolveVersion", () => {
       });
     });
     expect(await resolveVersion("latest", "")).toBe("1.2.3");
-    expect(getJsonMock).toHaveBeenCalledTimes(2);
-    expect(warningMock).toHaveBeenCalledTimes(1);
+    expect(httpMocks.getJson).toHaveBeenCalledTimes(2);
+    expect(coreMocks.warning).toHaveBeenCalledTimes(1);
   });
 
   test("retries on empty body then succeeds", async () => {
     let attempt = 0;
-    getJsonMock.mockImplementation(() => {
+    httpMocks.getJson.mockImplementation(() => {
       attempt++;
       if (attempt < 2) {
         return Promise.resolve({ statusCode: 200, result: null, headers: {} });
@@ -103,12 +59,12 @@ describe("resolveVersion", () => {
       });
     });
     expect(await resolveVersion("latest", "")).toBe("4.5.6");
-    expect(getJsonMock).toHaveBeenCalledTimes(2);
+    expect(httpMocks.getJson).toHaveBeenCalledTimes(2);
   });
 
   test("retries on thrown error then succeeds", async () => {
     let attempt = 0;
-    getJsonMock.mockImplementation(() => {
+    httpMocks.getJson.mockImplementation(() => {
       attempt++;
       if (attempt < 2) {
         return Promise.reject(new Error("ECONNRESET"));
@@ -120,23 +76,48 @@ describe("resolveVersion", () => {
       });
     });
     expect(await resolveVersion("latest", "")).toBe("7.8.9");
-    expect(getJsonMock).toHaveBeenCalledTimes(2);
+    expect(httpMocks.getJson).toHaveBeenCalledTimes(2);
   });
 
   test("throws with attempt summary when all retries fail", async () => {
-    getJsonMock.mockImplementation(() =>
+    httpMocks.getJson.mockImplementation(() =>
       Promise.resolve({ statusCode: 200, result: null, headers: {} }),
     );
     await expect(resolveVersion("latest", "")).rejects.toThrow(
-      /Failed to resolve latest OCX version after 3 attempts/,
+      /resolve latest OCX version failed after 3 attempts/,
     );
-    expect(getJsonMock).toHaveBeenCalledTimes(3);
+    expect(httpMocks.getJson).toHaveBeenCalledTimes(3);
   });
 
   test("error message includes all attempts' status codes", async () => {
-    getJsonMock.mockImplementation(() =>
+    httpMocks.getJson.mockImplementation(() =>
       Promise.resolve({ statusCode: 500, result: null, headers: {} }),
     );
     await expect(resolveVersion("latest", "")).rejects.toThrow(/HTTP 500/);
+  });
+
+  test("does not retry on 4xx (except 408/429)", async () => {
+    httpMocks.getJson.mockImplementation(() =>
+      Promise.resolve({ statusCode: 404, result: null, headers: {} }),
+    );
+    await expect(resolveVersion("latest", "")).rejects.toThrow(/HTTP 404/);
+    expect(httpMocks.getJson).toHaveBeenCalledTimes(1);
+  });
+
+  test("retries on 429 Too Many Requests", async () => {
+    let attempt = 0;
+    httpMocks.getJson.mockImplementation(() => {
+      attempt++;
+      if (attempt < 2) {
+        return Promise.resolve({ statusCode: 429, result: null, headers: {} });
+      }
+      return Promise.resolve({
+        statusCode: 200,
+        result: { tag_name: "v2.0.0" },
+        headers: {},
+      });
+    });
+    expect(await resolveVersion("latest", "")).toBe("2.0.0");
+    expect(httpMocks.getJson).toHaveBeenCalledTimes(2);
   });
 });

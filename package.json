@@ -2,10 +2,16 @@
   "name": "setup-ocx",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "GitHub Action to install the OCX package manager",
   "scripts": {
     "build": "bun scripts/build.ts",
-    "test": "bun test"
+    "test": "bun test",
+    "test:coverage": "bun test --coverage --coverage-reporter=lcov --coverage-reporter=text",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "fmt": "prettier --write .",
+    "fmt:check": "prettier --check ."
   },
   "engines": {
     "node": ">=24"
@@ -18,8 +24,13 @@
     "@actions/tool-cache": "^4.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^9.16.0",
     "@types/node": "^25.5.0",
     "esbuild": "^0.27.4",
-    "typescript": "^5.9.3"
+    "eslint": "^9.16.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.18.0"
   }
 }

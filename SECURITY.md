@@ -7,6 +7,7 @@ If you discover a security vulnerability in setup-ocx, please report it responsi
 **Email:** [contact@michael-herwig.de](mailto:contact@michael-herwig.de)
 
 Please include:
+
 - Description of the vulnerability
 - Steps to reproduce
 - Potential impact

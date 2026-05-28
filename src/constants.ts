@@ -1,4 +1,4 @@
-import * as fs from "fs";
+import * as fs from "node:fs";
 
 export const REPO_OWNER = "ocx-sh";
 export const REPO_NAME = "ocx";
@@ -15,7 +15,7 @@ const ARCH_MAP: Record<string, string> = {
  * Detects whether the current Linux system uses musl or glibc.
  * Checks for the musl dynamic linker in the given lib directory.
  */
-export function detectLibc(libDir: string = "/lib"): Libc {
+export function detectLibc(libDir = "/lib"): Libc {
   try {
     const entries = fs.readdirSync(libDir);
     if (entries.some((e) => e.startsWith("ld-musl"))) {
@@ -27,11 +27,10 @@ export function detectLibc(libDir: string = "/lib"): Libc {
   return "gnu";
 }
 
-export function getTarget(options?: {
-  platform?: string;
-  arch?: string;
-  libc?: Libc;
-}): { target: string; isWindows: boolean } {
+export function getTarget(options?: { platform?: string; arch?: string; libc?: Libc }): {
+  target: string;
+  isWindows: boolean;
+} {
   const platform = options?.platform ?? process.platform;
   const arch = options?.arch ?? process.arch;
 

@@ -1,13 +1,10 @@
 import * as core from "@actions/core";
 import * as exec from "@actions/exec";
-import * as fs from "fs";
-import * as os from "os";
-import * as path from "path";
-import {
-  type ObjectStoreCacheConfig,
-  buildCacheKey,
-  restoreObjectStoreCache,
-} from "./cache";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { buildCacheKey, restoreObjectStoreCache } from "./cache.js";
+import type { ObjectStoreCacheConfig } from "./cache.js";
 
 export interface ToolchainInputs {
   workingDirectory: string;
@@ -45,16 +42,14 @@ export function readToolchainInputs(): ToolchainInputs | null {
   }
 
   const workingDirectory =
-    core.getInput("working-directory") || process.env.GITHUB_WORKSPACE || process.cwd();
+    core.getInput("working-directory") || (process.env.GITHUB_WORKSPACE ?? process.cwd());
 
   const toolchainFile = path.isAbsolute(rawToolchain)
     ? rawToolchain
     : path.join(workingDirectory, rawToolchain);
 
   if (!fs.existsSync(toolchainFile)) {
-    core.info(
-      `No toolchain at ${toolchainFile} — skipping toolchain activation.`,
-    );
+    core.info(`No toolchain at ${toolchainFile} — skipping toolchain activation.`);
     return null;
   }
 
@@ -75,9 +70,7 @@ export function readToolchainInputs(): ToolchainInputs | null {
   const cacheSuffix = core.getInput("cache-suffix");
 
   const ocxHomeInput = core.getInput("ocx-home");
-  const ocxHome = ocxHomeInput
-    ? path.resolve(ocxHomeInput)
-    : path.join(os.homedir(), ".ocx");
+  const ocxHome = ocxHomeInput ? path.resolve(ocxHomeInput) : path.join(os.homedir(), ".ocx");
 
   return {
     workingDirectory,
@@ -98,9 +91,7 @@ export function readToolchainInputs(): ToolchainInputs | null {
  *   4. `ocx --project <toolchain> env --shell=bash|powershell` — apply env
  *   5. saveState for the post step
  */
-export async function loadToolchain(
-  args: LoadToolchainArgs,
-): Promise<LoadToolchainResult> {
+export async function loadToolchain(args: LoadToolchainArgs): Promise<LoadToolchainResult> {
   const { ocxBin, ocxVersion, libc, inputs } = args;
 
   core.exportVariable("OCX_HOME", inputs.ocxHome);
@@ -134,18 +125,14 @@ export async function loadToolchain(
   await core.group("ocx env", async () => {
     const shellArg = process.platform === "win32" ? "powershell" : "bash";
     let envOutput = "";
-    await exec.exec(
-      ocxBin,
-      ["--project", inputs.toolchainFile, "env", `--shell=${shellArg}`],
-      {
-        cwd: inputs.workingDirectory,
-        listeners: {
-          stdout: (data) => {
-            envOutput += data.toString();
-          },
+    await exec.exec(ocxBin, ["--project", inputs.toolchainFile, "env", `--shell=${shellArg}`], {
+      cwd: inputs.workingDirectory,
+      listeners: {
+        stdout: (data) => {
+          envOutput += data.toString();
         },
       },
-    );
+    });
     applyShellExports(envOutput, shellArg);
   });
 
@@ -177,14 +164,14 @@ export function applyShellExports(text: string, shell: "bash" | "powershell"): v
     if (!trimmed || trimmed.startsWith("#")) continue;
 
     if (shell === "bash") {
-      const m = trimmed.match(/^export\s+([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
-      if (!m) continue;
+      const m = /^export\s+([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(trimmed);
+      if (!m?.[1] || m[2] === undefined) continue;
       const name = m[1];
       const value = unquoteBash(m[2]);
       applyAssignment(name, value, /[:]\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$/);
     } else {
-      const m = trimmed.match(/^\$env:([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
-      if (!m) continue;
+      const m = /^\$env:([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(trimmed);
+      if (!m?.[1] || m[2] === undefined) continue;
       const name = m[1];
       const value = unquotePs(m[2]);
       applyAssignment(name, value, /;\$env:[A-Za-z_][A-Za-z0-9_]*$/);
@@ -193,7 +180,7 @@ export function applyShellExports(text: string, shell: "bash" | "powershell"): v
 }
 
 function applyAssignment(name: string, value: string, prependTail: RegExp): void {
-  const tailMatch = value.match(prependTail);
+  const tailMatch = prependTail.exec(value);
   if (name === "PATH" && tailMatch) {
     // Strip the trailing `:${PATH}` (or `;$env:PATH`) and push remaining entries.
     const prefix = value.slice(0, tailMatch.index);

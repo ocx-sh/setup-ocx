@@ -1,0 +1,7 @@
+[test]
+preload = ["./tests/setup-mocks.ts"]
+coverage = true
+coverageReporter = ["text", "lcov"]
+coverageDir = "coverage"
+coverageThreshold = { line = 0.85, function = 0.85, statement = 0.85 }
+coverageSkipTestFiles = true

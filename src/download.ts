@@ -1,10 +1,11 @@
 import * as cache from "@actions/cache";
 import * as core from "@actions/core";
 import * as tc from "@actions/tool-cache";
-import * as crypto from "crypto";
-import * as fs from "fs";
-import * as path from "path";
-import { type Libc, getArchiveName, getDownloadUrl, getTarget } from "./constants";
+import * as crypto from "node:crypto";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import { getArchiveName, getDownloadUrl, getTarget } from "./constants.js";
+import type { Libc } from "./constants.js";
 
 export interface DownloadResult {
   binDir: string;
@@ -45,7 +46,7 @@ export async function downloadOcx(
   libc?: Libc,
   options?: DownloadOptions,
 ): Promise<DownloadResult> {
-  const { target, isWindows } = getTarget({ libc });
+  const { target, isWindows } = getTarget(libc !== undefined ? { libc } : {});
   const archiveName = getArchiveName(target, isWindows);
   const cacheEnabled = options?.cache ?? true;
 
@@ -63,8 +64,7 @@ export async function downloadOcx(
   // 2. Cross-run overlay: try @actions/cache against the tool-cache dir.
   const cacheKey = binaryCacheKey(target, version);
   const cachePath = toolCachePath(version);
-  const overlayAvailable =
-    cacheEnabled && cachePath !== null && cache.isFeatureAvailable();
+  const overlayAvailable = cacheEnabled && cachePath !== null && cache.isFeatureAvailable();
 
   if (overlayAvailable && cachePath) {
     try {
@@ -86,7 +86,7 @@ export async function downloadOcx(
       }
     } catch (err) {
       core.warning(
-        `Failed to restore ocx binary cache: ${err instanceof Error ? err.message : err}`,
+        `Failed to restore ocx binary cache: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
   }
@@ -110,7 +110,10 @@ export async function downloadOcx(
     token ? `Bearer ${token}` : undefined,
   );
   const checksumContent = fs.readFileSync(checksumPath, "utf8").trim();
-  const expectedHash = checksumContent.split(/\s+/)[0];
+  const expectedHash = checksumContent.split(/\s+/)[0] ?? "";
+  if (!expectedHash) {
+    throw new Error(`Empty checksum body fetched from ${checksumUrl}`);
+  }
 
   const fileBuffer = fs.readFileSync(archivePath);
   const actualHash = crypto.createHash("sha256").update(fileBuffer).digest("hex");
@@ -154,7 +157,7 @@ export async function saveBinaryCache(cachePath: string, key: string): Promise<v
     await cache.saveCache([cachePath], key);
   } catch (err) {
     core.warning(
-      `Failed to save ocx binary cache: ${err instanceof Error ? err.message : err}`,
+      `Failed to save ocx binary cache: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 }

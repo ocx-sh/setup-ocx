@@ -1,0 +1,7 @@
+dist/
+coverage/
+node_modules/
+*.lock
+ocx.lock
+bun.lock
+CHANGELOG.md

@@ -1,8 +1,8 @@
 import * as cache from "@actions/cache";
 import * as core from "@actions/core";
-import * as crypto from "crypto";
-import * as fs from "fs";
-import * as path from "path";
+import * as crypto from "node:crypto";
+import * as fs from "node:fs";
+import * as path from "node:path";
 
 /**
  * Subdirectories of $OCX_HOME worth caching across runs.
@@ -70,9 +70,7 @@ export interface RestoreResult {
   matchedKey?: string;
 }
 
-export async function restoreObjectStoreCache(
-  cfg: ObjectStoreCacheConfig,
-): Promise<RestoreResult> {
+export async function restoreObjectStoreCache(cfg: ObjectStoreCacheConfig): Promise<RestoreResult> {
   const key = buildCacheKey(cfg);
   if (!cache.isFeatureAvailable()) {
     core.warning(
@@ -88,11 +86,7 @@ export async function restoreObjectStoreCache(
   }
 
   try {
-    const matched = await cache.restoreCache(
-      cachePaths(cfg.ocxHome),
-      key,
-      restoreKeys(cfg),
-    );
+    const matched = await cache.restoreCache(cachePaths(cfg.ocxHome), key, restoreKeys(cfg));
     if (matched) {
       core.info(`Restored OCX object store cache (matched key: ${matched})`);
       return { key, hit: matched === key, matchedKey: matched };
@@ -101,16 +95,13 @@ export async function restoreObjectStoreCache(
     return { key, hit: false };
   } catch (err) {
     core.warning(
-      `Failed to restore OCX object store cache: ${err instanceof Error ? err.message : err}`,
+      `Failed to restore OCX object store cache: ${err instanceof Error ? err.message : String(err)}`,
     );
     return { key, hit: false };
   }
 }
 
-export async function saveObjectStoreCache(
-  ocxHome: string,
-  key: string,
-): Promise<void> {
+export async function saveObjectStoreCache(ocxHome: string, key: string): Promise<void> {
   if (!cache.isFeatureAvailable()) {
     return;
   }
@@ -119,7 +110,7 @@ export async function saveObjectStoreCache(
     await cache.saveCache(cachePaths(ocxHome), key);
   } catch (err) {
     core.warning(
-      `Failed to save OCX object store cache: ${err instanceof Error ? err.message : err}`,
+      `Failed to save OCX object store cache: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 }

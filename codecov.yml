@@ -1,0 +1,26 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 85%
+        threshold: 1%
+    patch:
+      default:
+        target: 90%
+
+ignore:
+  - "dist/"
+  - "scripts/"
+  - "tests/"
+
+comment:
+  layout: "reach, diff, flags, files"
+  require_changes: true
+
+flag_management:
+  default_rules:
+    carryforward: true
+  individual_flags:
+    - name: unittests
+      paths:
+        - src/

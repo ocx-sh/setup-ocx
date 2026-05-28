@@ -1,8 +1,8 @@
-import { describe, test, expect } from "bun:test";
-import * as fs from "fs";
-import * as os from "os";
-import * as path from "path";
-import { detectLibc, getArchiveName, getDownloadUrl, getTarget } from "../src/constants";
+import { describe, expect, test } from "bun:test";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { detectLibc, getArchiveName, getDownloadUrl, getTarget } from "../src/constants.js";
 
 describe("getTarget", () => {
   // Linux with explicit libc
@@ -133,9 +133,7 @@ describe("getArchiveName", () => {
   });
 
   test("windows archive uses .zip", () => {
-    expect(getArchiveName("x86_64-pc-windows-msvc", true)).toBe(
-      "ocx-x86_64-pc-windows-msvc.zip",
-    );
+    expect(getArchiveName("x86_64-pc-windows-msvc", true)).toBe("ocx-x86_64-pc-windows-msvc.zip");
   });
 });
 
