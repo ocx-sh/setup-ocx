@@ -25,13 +25,18 @@ export function binaryCacheKey(target: string, version: string): string {
 }
 
 /**
- * Path inside RUNNER_TOOL_CACHE where @actions/tool-cache stores the
- * extracted ocx archive. We snapshot this directory for cross-run reuse.
+ * Path inside RUNNER_TOOL_CACHE that we snapshot for cross-run reuse.
+ *
+ * `@actions/tool-cache` stores the extracted archive at
+ * `<root>/ocx/<version>/<arch>/` and writes a sibling marker
+ * `<root>/ocx/<version>/<arch>.complete`. `tc.find()` only returns a hit
+ * when the marker exists, so the cache must include the version-level
+ * directory (not just the arch subdir) to round-trip both.
  */
-function toolCachePath(version: string, arch: string): string | null {
+function toolCachePath(version: string): string | null {
   const root = process.env.RUNNER_TOOL_CACHE;
   if (!root) return null;
-  return path.join(root, "ocx", version, arch);
+  return path.join(root, "ocx", version);
 }
 
 export async function downloadOcx(
@@ -57,7 +62,7 @@ export async function downloadOcx(
 
   // 2. Cross-run overlay: try @actions/cache against the tool-cache dir.
   const cacheKey = binaryCacheKey(target, version);
-  const cachePath = toolCachePath(version, process.arch);
+  const cachePath = toolCachePath(version);
   const overlayAvailable =
     cacheEnabled && cachePath !== null && cache.isFeatureAvailable();
 

@@ -263,7 +263,7 @@ describe("downloadOcx", () => {
       );
       expect(saveStateMock).toHaveBeenCalledWith(
         "bin-cache-path",
-        path.join(runnerToolCache, "ocx", "0.2.0", process.arch),
+        path.join(runnerToolCache, "ocx", "0.2.0"),
       );
     } finally {
       if (oldEnv === undefined) delete process.env.RUNNER_TOOL_CACHE;

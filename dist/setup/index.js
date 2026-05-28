@@ -107731,10 +107731,10 @@ var path6 = __toESM(require("path"));
 function binaryCacheKey(target, version2) {
   return `setup-ocx-bin-${target}-${version2}`;
 }
-function toolCachePath(version2, arch3) {
+function toolCachePath(version2) {
   const root = process.env.RUNNER_TOOL_CACHE;
   if (!root) return null;
-  return path6.join(root, "ocx", version2, arch3);
+  return path6.join(root, "ocx", version2);
 }
 async function downloadOcx(version2, token, libc, options) {
   const { target, isWindows } = getTarget({ libc });
@@ -107749,7 +107749,7 @@ async function downloadOcx(version2, token, libc, options) {
     return { binDir: binDir2, version: version2, cacheHit: true };
   }
   const cacheKey = binaryCacheKey(target, version2);
-  const cachePath = toolCachePath(version2, process.arch);
+  const cachePath = toolCachePath(version2);
   const overlayAvailable = cacheEnabled && cachePath !== null && cache.isFeatureAvailable();
   if (overlayAvailable && cachePath) {
     try {
