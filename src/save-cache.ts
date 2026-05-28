@@ -1,6 +1,6 @@
 import * as core from "@actions/core";
-import { saveObjectStoreCache } from "./cache";
-import { saveBinaryCache } from "./download";
+import { saveObjectStoreCache } from "./cache.js";
+import { saveBinaryCache } from "./download.js";
 
 /**
  * Post-step entry point. Persists caches that the main step deferred.
@@ -16,7 +16,7 @@ import { saveBinaryCache } from "./download";
  *
  * Save failures degrade to warnings — they must never fail the user's job.
  */
-async function run(): Promise<void> {
+export async function run(): Promise<void> {
   // 1. Toolchain object store.
   const tcKey = core.getState("cache-key");
   const ocxHome = core.getState("ocx-home");
@@ -35,8 +35,6 @@ async function run(): Promise<void> {
   }
 }
 
-run().catch((err) => {
-  core.warning(
-    `setup-ocx post step failed: ${err instanceof Error ? err.message : err}`,
-  );
+run().catch((err: unknown) => {
+  core.warning(`setup-ocx post step failed: ${err instanceof Error ? err.message : String(err)}`);
 });

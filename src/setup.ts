@@ -1,9 +1,10 @@
 import * as core from "@actions/core";
-import * as path from "path";
-import { type Libc, detectLibc } from "./constants";
-import { downloadOcx } from "./download";
-import { loadToolchain, readToolchainInputs } from "./toolchain";
-import { resolveVersion } from "./version";
+import * as path from "node:path";
+import { detectLibc } from "./constants.js";
+import type { Libc } from "./constants.js";
+import { downloadOcx } from "./download.js";
+import { loadToolchain, readToolchainInputs } from "./toolchain.js";
+import { resolveVersion } from "./version.js";
 
 export async function run(): Promise<void> {
   try {
@@ -28,12 +29,11 @@ export async function run(): Promise<void> {
     }
 
     const version = await resolveVersion(versionInput, token);
-    const { binDir, version: installedVersion, cacheHit } = await downloadOcx(
-      version,
-      token,
-      libc,
-      { cache: cacheInput },
-    );
+    const {
+      binDir,
+      version: installedVersion,
+      cacheHit,
+    } = await downloadOcx(version, token, libc, { cache: cacheInput });
 
     core.addPath(binDir);
     core.exportVariable("OCX_NO_UPDATE_CHECK", "1");
@@ -99,4 +99,4 @@ export async function run(): Promise<void> {
   }
 }
 
-run();
+void run();

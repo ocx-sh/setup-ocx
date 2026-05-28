@@ -6,20 +6,20 @@ GitHub Action installing OCX package manager into CI runners. Node 24 JS action 
 
 `src/` → bundled by esbuild into two committed entrypoints under `dist/`:
 
-| Entry | Source | Responsibility |
-|---|---|---|
-| `dist/setup/index.js` | `src/setup.ts` | main — read inputs → resolve version → download+verify → cache → activate toolchain |
+| Entry                      | Source              | Responsibility                                                                      |
+| -------------------------- | ------------------- | ----------------------------------------------------------------------------------- |
+| `dist/setup/index.js`      | `src/setup.ts`      | main — read inputs → resolve version → download+verify → cache → activate toolchain |
 | `dist/save-cache/index.js` | `src/save-cache.ts` | post (`post-if: success()`) — saves binary + object-store caches deferred from main |
 
 Module map (under `src/`):
 
-| Module | Role |
-|---|---|
-| `version.ts` | Resolve `"latest"` → concrete version via GitHub Releases API (with retry) |
-| `constants.ts` | Map Node `platform`/`arch` → Rust target triples; detect musl vs gnu libc |
-| `download.ts` | Download archive, verify SHA256, extract, cache binary (overlays `@actions/cache` over `RUNNER_TOOL_CACHE`) |
-| `cache.ts` | `$OCX_HOME` object-store cache (selective dirs, lockfile-hash key) |
-| `toolchain.ts` | Discover `ocx.toml`, run `ocx pull`, parse `ocx env`, export PATH |
+| Module         | Role                                                                                                        |
+| -------------- | ----------------------------------------------------------------------------------------------------------- |
+| `version.ts`   | Resolve `"latest"` → concrete version via GitHub Releases API (with retry)                                  |
+| `constants.ts` | Map Node `platform`/`arch` → Rust target triples; detect musl vs gnu libc                                   |
+| `download.ts`  | Download archive, verify SHA256, extract, cache binary (overlays `@actions/cache` over `RUNNER_TOOL_CACHE`) |
+| `cache.ts`     | `$OCX_HOME` object-store cache (selective dirs, lockfile-hash key)                                          |
+| `toolchain.ts` | Discover `ocx.toml`, run `ocx pull`, parse `ocx env`, export PATH                                           |
 
 Tests in `tests/` map 1:1 to `src/` modules (`tests/<name>.test.ts`).
 

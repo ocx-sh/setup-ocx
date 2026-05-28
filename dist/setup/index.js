@@ -60083,6 +60083,121 @@ var require_browser = __commonJS({
   }
 });
 
+// node_modules/has-flag/index.js
+var require_has_flag = __commonJS({
+  "node_modules/has-flag/index.js"(exports2, module2) {
+    "use strict";
+    module2.exports = (flag, argv = process.argv) => {
+      const prefix2 = flag.startsWith("-") ? "" : flag.length === 1 ? "-" : "--";
+      const position = argv.indexOf(prefix2 + flag);
+      const terminatorPosition = argv.indexOf("--");
+      return position !== -1 && (terminatorPosition === -1 || position < terminatorPosition);
+    };
+  }
+});
+
+// node_modules/supports-color/index.js
+var require_supports_color = __commonJS({
+  "node_modules/supports-color/index.js"(exports2, module2) {
+    "use strict";
+    var os9 = require("os");
+    var tty = require("tty");
+    var hasFlag = require_has_flag();
+    var { env } = process;
+    var forceColor;
+    if (hasFlag("no-color") || hasFlag("no-colors") || hasFlag("color=false") || hasFlag("color=never")) {
+      forceColor = 0;
+    } else if (hasFlag("color") || hasFlag("colors") || hasFlag("color=true") || hasFlag("color=always")) {
+      forceColor = 1;
+    }
+    if ("FORCE_COLOR" in env) {
+      if (env.FORCE_COLOR === "true") {
+        forceColor = 1;
+      } else if (env.FORCE_COLOR === "false") {
+        forceColor = 0;
+      } else {
+        forceColor = env.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env.FORCE_COLOR, 10), 3);
+      }
+    }
+    function translateLevel(level) {
+      if (level === 0) {
+        return false;
+      }
+      return {
+        level,
+        hasBasic: true,
+        has256: level >= 2,
+        has16m: level >= 3
+      };
+    }
+    function supportsColor(haveStream, streamIsTTY) {
+      if (forceColor === 0) {
+        return 0;
+      }
+      if (hasFlag("color=16m") || hasFlag("color=full") || hasFlag("color=truecolor")) {
+        return 3;
+      }
+      if (hasFlag("color=256")) {
+        return 2;
+      }
+      if (haveStream && !streamIsTTY && forceColor === void 0) {
+        return 0;
+      }
+      const min = forceColor || 0;
+      if (env.TERM === "dumb") {
+        return min;
+      }
+      if (process.platform === "win32") {
+        const osRelease = os9.release().split(".");
+        if (Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586) {
+          return Number(osRelease[2]) >= 14931 ? 3 : 2;
+        }
+        return 1;
+      }
+      if ("CI" in env) {
+        if (["TRAVIS", "CIRCLECI", "APPVEYOR", "GITLAB_CI", "GITHUB_ACTIONS", "BUILDKITE"].some((sign) => sign in env) || env.CI_NAME === "codeship") {
+          return 1;
+        }
+        return min;
+      }
+      if ("TEAMCITY_VERSION" in env) {
+        return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env.TEAMCITY_VERSION) ? 1 : 0;
+      }
+      if (env.COLORTERM === "truecolor") {
+        return 3;
+      }
+      if ("TERM_PROGRAM" in env) {
+        const version2 = parseInt((env.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
+        switch (env.TERM_PROGRAM) {
+          case "iTerm.app":
+            return version2 >= 3 ? 3 : 2;
+          case "Apple_Terminal":
+            return 2;
+        }
+      }
+      if (/-256(color)?$/i.test(env.TERM)) {
+        return 2;
+      }
+      if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env.TERM)) {
+        return 1;
+      }
+      if ("COLORTERM" in env) {
+        return 1;
+      }
+      return min;
+    }
+    function getSupportLevel(stream2) {
+      const level = supportsColor(stream2, stream2 && stream2.isTTY);
+      return translateLevel(level);
+    }
+    module2.exports = {
+      supportsColor: getSupportLevel,
+      stdout: translateLevel(supportsColor(true, tty.isatty(1))),
+      stderr: translateLevel(supportsColor(true, tty.isatty(2)))
+    };
+  }
+});
+
 // node_modules/debug/src/node.js
 var require_node = __commonJS({
   "node_modules/debug/src/node.js"(exports2, module2) {
@@ -60101,7 +60216,7 @@ var require_node = __commonJS({
     );
     exports2.colors = [6, 2, 3, 4, 5, 1];
     try {
-      const supportsColor = require("supports-color");
+      const supportsColor = require_supports_color();
       if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
         exports2.colors = [
           20,
@@ -106413,10 +106528,10 @@ function saveState(name, value) {
 }
 
 // src/setup.ts
-var path9 = __toESM(require("path"));
+var path9 = __toESM(require("node:path"), 1);
 
 // src/constants.ts
-var fs3 = __toESM(require("fs"));
+var fs3 = __toESM(require("node:fs"), 1);
 var REPO_OWNER = "ocx-sh";
 var REPO_NAME = "ocx";
 var ARCH_MAP = {
@@ -106468,7 +106583,7 @@ function getDownloadUrl(version2, filename) {
 }
 
 // src/download.ts
-var cache = __toESM(require_cache5());
+var cache = __toESM(require_cache5(), 1);
 
 // node_modules/@actions/tool-cache/node_modules/@actions/io/lib/io.js
 var import_assert = require("assert");
@@ -107725,9 +107840,9 @@ function _getGlobal(key, defaultValue) {
 }
 
 // src/download.ts
-var crypto4 = __toESM(require("crypto"));
-var fs7 = __toESM(require("fs"));
-var path6 = __toESM(require("path"));
+var crypto4 = __toESM(require("node:crypto"), 1);
+var fs7 = __toESM(require("node:fs"), 1);
+var path6 = __toESM(require("node:path"), 1);
 function binaryCacheKey(target, version2) {
   return `setup-ocx-bin-${target}-${version2}`;
 }
@@ -107737,7 +107852,7 @@ function toolCachePath(version2) {
   return path6.join(root, "ocx", version2);
 }
 async function downloadOcx(version2, token, libc, options) {
-  const { target, isWindows } = getTarget({ libc });
+  const { target, isWindows } = getTarget(libc !== void 0 ? { libc } : {});
   const archiveName = getArchiveName(target, isWindows);
   const cacheEnabled = options?.cache ?? true;
   info(`Target: ${target}`);
@@ -107771,7 +107886,7 @@ async function downloadOcx(version2, token, libc, options) {
       }
     } catch (err) {
       warning(
-        `Failed to restore ocx binary cache: ${err instanceof Error ? err.message : err}`
+        `Failed to restore ocx binary cache: ${err instanceof Error ? err.message : String(err)}`
       );
     }
   }
@@ -107790,7 +107905,10 @@ async function downloadOcx(version2, token, libc, options) {
     token ? `Bearer ${token}` : void 0
   );
   const checksumContent = fs7.readFileSync(checksumPath, "utf8").trim();
-  const expectedHash = checksumContent.split(/\s+/)[0];
+  const expectedHash = checksumContent.split(/\s+/)[0] ?? "";
+  if (!expectedHash) {
+    throw new Error(`Empty checksum body fetched from ${checksumUrl}`);
+  }
   const fileBuffer = fs7.readFileSync(archivePath);
   const actualHash = crypto4.createHash("sha256").update(fileBuffer).digest("hex");
   debug(`SHA256 expected=${expectedHash} actual=${actualHash}`);
@@ -107835,16 +107953,16 @@ function findBinDir(dir) {
 }
 
 // src/toolchain.ts
-var exec2 = __toESM(require_exec());
-var fs9 = __toESM(require("fs"));
-var os8 = __toESM(require("os"));
-var path8 = __toESM(require("path"));
+var exec2 = __toESM(require_exec(), 1);
+var fs9 = __toESM(require("node:fs"), 1);
+var os8 = __toESM(require("node:os"), 1);
+var path8 = __toESM(require("node:path"), 1);
 
 // src/cache.ts
-var cache2 = __toESM(require_cache5());
-var crypto5 = __toESM(require("crypto"));
-var fs8 = __toESM(require("fs"));
-var path7 = __toESM(require("path"));
+var cache2 = __toESM(require_cache5(), 1);
+var crypto5 = __toESM(require("node:crypto"), 1);
+var fs8 = __toESM(require("node:fs"), 1);
+var path7 = __toESM(require("node:path"), 1);
 var CACHED_DIRS = ["blobs", "layers", "packages", "tags"];
 function hashFile(filePath) {
   try {
@@ -107882,11 +108000,7 @@ async function restoreObjectStoreCache(cfg) {
     fs8.mkdirSync(dir, { recursive: true });
   }
   try {
-    const matched = await cache2.restoreCache(
-      cachePaths(cfg.ocxHome),
-      key,
-      restoreKeys(cfg)
-    );
+    const matched = await cache2.restoreCache(cachePaths(cfg.ocxHome), key, restoreKeys(cfg));
     if (matched) {
       info(`Restored OCX object store cache (matched key: ${matched})`);
       return { key, hit: matched === key, matchedKey: matched };
@@ -107895,7 +108009,7 @@ async function restoreObjectStoreCache(cfg) {
     return { key, hit: false };
   } catch (err) {
     warning(
-      `Failed to restore OCX object store cache: ${err instanceof Error ? err.message : err}`
+      `Failed to restore OCX object store cache: ${err instanceof Error ? err.message : String(err)}`
     );
     return { key, hit: false };
   }
@@ -107907,12 +108021,10 @@ function readToolchainInputs() {
   if (!rawToolchain) {
     return null;
   }
-  const workingDirectory = getInput("working-directory") || process.env.GITHUB_WORKSPACE || process.cwd();
+  const workingDirectory = getInput("working-directory") || (process.env.GITHUB_WORKSPACE ?? process.cwd());
   const toolchainFile = path8.isAbsolute(rawToolchain) ? rawToolchain : path8.join(workingDirectory, rawToolchain);
   if (!fs9.existsSync(toolchainFile)) {
-    info(
-      `No toolchain at ${toolchainFile} \u2014 skipping toolchain activation.`
-    );
+    info(`No toolchain at ${toolchainFile} \u2014 skipping toolchain activation.`);
     return null;
   }
   const lockFile = path8.join(path8.dirname(toolchainFile), "ocx.lock");
@@ -107964,18 +108076,14 @@ async function loadToolchain(args) {
   await group("ocx env", async () => {
     const shellArg = process.platform === "win32" ? "powershell" : "bash";
     let envOutput = "";
-    await exec2.exec(
-      ocxBin,
-      ["--project", inputs.toolchainFile, "env", `--shell=${shellArg}`],
-      {
-        cwd: inputs.workingDirectory,
-        listeners: {
-          stdout: (data) => {
-            envOutput += data.toString();
-          }
+    await exec2.exec(ocxBin, ["--project", inputs.toolchainFile, "env", `--shell=${shellArg}`], {
+      cwd: inputs.workingDirectory,
+      listeners: {
+        stdout: (data) => {
+          envOutput += data.toString();
         }
       }
-    );
+    });
     applyShellExports(envOutput, shellArg);
   });
   if (inputs.cacheEnabled) {
@@ -107991,14 +108099,14 @@ function applyShellExports(text, shell) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) continue;
     if (shell === "bash") {
-      const m = trimmed.match(/^export\s+([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
-      if (!m) continue;
+      const m = /^export\s+([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(trimmed);
+      if (!m?.[1] || m[2] === void 0) continue;
       const name = m[1];
       const value = unquoteBash(m[2]);
       applyAssignment(name, value, /[:]\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$/);
     } else {
-      const m = trimmed.match(/^\$env:([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
-      if (!m) continue;
+      const m = /^\$env:([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(trimmed);
+      if (!m?.[1] || m[2] === void 0) continue;
       const name = m[1];
       const value = unquotePs(m[2]);
       applyAssignment(name, value, /;\$env:[A-Za-z_][A-Za-z0-9_]*$/);
@@ -108006,7 +108114,7 @@ function applyShellExports(text, shell) {
   }
 }
 function applyAssignment(name, value, prependTail) {
-  const tailMatch = value.match(prependTail);
+  const tailMatch = prependTail.exec(value);
   if (name === "PATH" && tailMatch) {
     const prefix2 = value.slice(0, tailMatch.index);
     const sep2 = process.platform === "win32" ? ";" : ":";
@@ -108030,10 +108138,59 @@ function unquotePs(raw) {
   return s;
 }
 
-// src/version.ts
-var MAX_ATTEMPTS = 3;
-var BACKOFF_MS = [500, 1500, 4500];
+// src/http-retry.ts
+var DEFAULT_BACKOFF = [500, 1500, 4500];
+var DEFAULT_MAX_RETRY_AFTER_MS = 6e4;
 var sleep = (ms) => new Promise((resolve3) => setTimeout(resolve3, ms));
+async function withRetry(attempt, classify, opts = {}) {
+  const maxAttempts = opts.maxAttempts ?? 3;
+  const backoff = opts.backoffMs ?? DEFAULT_BACKOFF;
+  const label = opts.label ?? "operation";
+  const maxRetryAfter = opts.maxRetryAfterMs ?? DEFAULT_MAX_RETRY_AFTER_MS;
+  const reasons = [];
+  for (let i = 0; i < maxAttempts; i++) {
+    const outcome = await attempt(i);
+    const decision = classify(outcome);
+    if (decision.kind === "success") {
+      if (outcome.result === void 0) {
+        throw new Error(`${label}: classifier returned success without a result`);
+      }
+      if (i > 0) {
+        info(`${label}: resolved after ${i + 1} attempts.`);
+      }
+      return outcome.result;
+    }
+    if (decision.kind === "fail") {
+      reasons.push(`attempt ${i + 1}: ${decision.reason}`);
+      throw new Error(`${label} failed: ${reasons.join("; ")}`);
+    }
+    reasons.push(`attempt ${i + 1}: ${decision.reason}`);
+    if (i < maxAttempts - 1) {
+      const baseDelay = backoff[Math.min(i, backoff.length - 1)] ?? 0;
+      const delay4 = decision.retryAfterMs !== void 0 ? Math.min(decision.retryAfterMs, maxRetryAfter) : baseDelay;
+      warning(`${label}: ${decision.reason}; retrying in ${delay4}ms`);
+      await sleep(delay4);
+    }
+  }
+  throw new Error(`${label} failed after ${maxAttempts} attempts: ${reasons.join("; ")}`);
+}
+function parseRetryAfterMs(value) {
+  if (!value) return void 0;
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (!raw) return void 0;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.floor(seconds * 1e3);
+  }
+  const date = Date.parse(raw);
+  if (Number.isFinite(date)) {
+    const delta = date - Date.now();
+    return delta > 0 ? delta : 0;
+  }
+  return void 0;
+}
+
+// src/version.ts
 async function resolveVersion(version2, token) {
   if (version2 !== "latest") {
     return version2.replace(/^v/, "");
@@ -108044,49 +108201,46 @@ async function resolveVersion(version2, token) {
     Accept: "application/vnd.github.v3+json"
   };
   if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+    headers.Authorization = `Bearer ${token}`;
   }
   const url2 = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`;
   debug(`API URL: ${url2}`);
-  const attempts = [];
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    let response;
-    let thrown;
-    try {
-      response = await client.getJson(url2, headers);
-    } catch (error2) {
-      thrown = error2;
-    }
-    if (thrown) {
-      const msg = thrown instanceof Error ? thrown.message : String(thrown);
-      attempts.push(`attempt ${attempt + 1}: error ${msg}`);
-    } else if (!response) {
-      attempts.push(`attempt ${attempt + 1}: no response`);
-    } else if (response.statusCode >= 500) {
-      attempts.push(`attempt ${attempt + 1}: HTTP ${response.statusCode}`);
-    } else if (!response.result?.tag_name) {
-      attempts.push(
-        `attempt ${attempt + 1}: HTTP ${response.statusCode} with empty release body`
-      );
-    } else {
-      const resolved = response.result.tag_name.replace(/^v/, "");
-      if (attempt > 0) {
-        info(`Resolved after ${attempt + 1} attempts.`);
+  const resolved = await withRetry(
+    async () => {
+      try {
+        const response = await client.getJson(url2, headers);
+        const out = {
+          response: {
+            statusCode: response.statusCode,
+            headers: response.headers
+          }
+        };
+        const tag = response.result?.tag_name.replace(/^v/, "");
+        if (tag) out.result = tag;
+        return out;
+      } catch (error2) {
+        return { error: error2 };
       }
-      info(`Resolved latest version: ${resolved}`);
-      return resolved;
-    }
-    if (attempt < MAX_ATTEMPTS - 1) {
-      const delay4 = BACKOFF_MS[attempt];
-      warning(
-        `Failed to resolve latest OCX version (${attempts[attempts.length - 1]}); retrying in ${delay4}ms`
-      );
-      await sleep(delay4);
-    }
-  }
-  throw new Error(
-    `Failed to resolve latest OCX version after ${MAX_ATTEMPTS} attempts: ${attempts.join("; ")}`
+    },
+    (outcome) => {
+      if (outcome.error !== void 0) {
+        const msg = outcome.error instanceof Error ? outcome.error.message : JSON.stringify(outcome.error);
+        return { kind: "retry", reason: `network error ${msg}` };
+      }
+      const status = outcome.response?.statusCode ?? 0;
+      const retryAfterMs = parseRetryAfterMs(outcome.response?.headers?.["retry-after"]);
+      const retryDecision = (reason) => retryAfterMs !== void 0 ? { kind: "retry", reason, retryAfterMs } : { kind: "retry", reason };
+      if (status >= 500) return retryDecision(`HTTP ${status}`);
+      if (status === 408 || status === 429) return retryDecision(`HTTP ${status}`);
+      if (status >= 400) return { kind: "fail", reason: `HTTP ${status}` };
+      if (!outcome.result)
+        return { kind: "retry", reason: `HTTP ${status} with empty release body` };
+      return { kind: "success" };
+    },
+    { label: "resolve latest OCX version" }
   );
+  info(`Resolved latest version: ${resolved}`);
+  return resolved;
 }
 
 // src/setup.ts
@@ -108107,12 +108261,11 @@ async function run() {
       );
     }
     const version2 = await resolveVersion(versionInput, token);
-    const { binDir, version: installedVersion, cacheHit } = await downloadOcx(
-      version2,
-      token,
-      libc,
-      { cache: cacheInput }
-    );
+    const {
+      binDir,
+      version: installedVersion,
+      cacheHit
+    } = await downloadOcx(version2, token, libc, { cache: cacheInput });
     addPath(binDir);
     exportVariable("OCX_NO_UPDATE_CHECK", "1");
     if (isDebug()) {
@@ -108162,7 +108315,7 @@ async function run() {
     }
   }
 }
-run();
+void run();
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   run

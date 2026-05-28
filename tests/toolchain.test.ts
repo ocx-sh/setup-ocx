@@ -1,43 +1,9 @@
-import { describe, test, expect, mock, beforeEach } from "bun:test";
-import * as fs from "fs";
-import * as os from "os";
-import * as path from "path";
-
-// --- Mocks ---
-
-const infoMock = mock(() => {});
-const warningMock = mock(() => {});
-const exportVariableMock = mock(() => {});
-const addPathMock = mock(() => {});
-const saveStateMock = mock(() => {});
-const groupMock = mock(async (_name: string, fn: () => Promise<unknown>) => {
-  return fn();
-});
-
-let getInputValues: Record<string, string> = {};
-let booleanInputValues: Record<string, boolean> = {};
-
-// Full surface — bun's mock.module is process-global, so a missing key here
-// leaks to other test files whose source modules touch the missing function.
-mock.module("@actions/core", () => ({
-  info: infoMock,
-  debug: mock(() => {}),
-  warning: warningMock,
-  getInput: mock((name: string) => getInputValues[name] ?? ""),
-  getBooleanInput: mock((name: string) => booleanInputValues[name] ?? false),
-  setOutput: mock(() => {}),
-  setFailed: mock(() => {}),
-  exportVariable: exportVariableMock,
-  addPath: addPathMock,
-  isDebug: mock(() => false),
-  saveState: saveStateMock,
-  group: groupMock,
-  summary: {
-    addHeading: mock(function (this: unknown) { return this; }),
-    addTable: mock(function (this: unknown) { return this; }),
-    write: mock(() => Promise.resolve({ filePath: "" })),
-  },
-}));
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { cacheMocks, coreMocks, execMocks, inputState, resetMocks } from "./setup-mocks.js";
+import { applyShellExports, loadToolchain, readToolchainInputs } from "../src/toolchain.js";
 
 interface ExecCall {
   bin: string;
@@ -47,108 +13,74 @@ interface ExecCall {
 const execCalls: ExecCall[] = [];
 let envOutput = "";
 
-const execMock = mock(
-  async (
-    bin: string,
-    args: string[],
-    options?: {
-      cwd?: string;
-      listeners?: { stdout?: (data: Buffer) => void };
+beforeEach(() => {
+  resetMocks();
+  execCalls.length = 0;
+  envOutput = 'export PATH="/opt/bun/bin:${PATH}"\nexport BUN_VERSION="1.3"\n';
+  execMocks.exec.mockImplementation(
+    async (bin: string, args?: string[], options?): Promise<number> => {
+      execCalls.push({ bin, args: args ?? [], cwd: options?.cwd });
+      if (args?.includes("env") && options?.listeners?.stdout) {
+        options.listeners.stdout(Buffer.from(envOutput));
+      }
+      return 0;
     },
-  ): Promise<number> => {
-    execCalls.push({ bin, args, cwd: options?.cwd });
-    if (args.includes("env") && options?.listeners?.stdout) {
-      options.listeners.stdout(Buffer.from(envOutput));
-    }
-    return 0;
-  },
-);
+  );
+});
 
-mock.module("@actions/exec", () => ({ exec: execMock }));
-
-// Use the real ../src/cache module — mocking source modules pollutes other
-// test files because bun's mock.module is global. We mock @actions/cache
-// directly instead.
-const isFeatureAvailableMock = mock(() => false);
-const restoreCacheMock = mock(() => Promise.resolve(undefined as string | undefined));
-const saveCacheMock = mock(() => Promise.resolve(0));
-
-mock.module("@actions/cache", () => ({
-  isFeatureAvailable: isFeatureAvailableMock,
-  restoreCache: restoreCacheMock,
-  saveCache: saveCacheMock,
-}));
-
-const { applyShellExports, readToolchainInputs, loadToolchain } = await import(
-  "../src/toolchain"
-);
+afterEach(() => {
+  mock.restore();
+});
 
 function tempDir(): string {
   const dir = path.join(
     os.tmpdir(),
-    `test-toolchain-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    `test-toolchain-${Date.now().toString()}-${Math.random().toString(36).slice(2)}`,
   );
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
 
 describe("applyShellExports", () => {
-  beforeEach(() => {
-    exportVariableMock.mockClear();
-    addPathMock.mockClear();
-  });
-
   test("splits bash PATH prepend into individual addPath calls", () => {
-    const text = [
-      'export PATH="/a/b:/c/d:${PATH}"',
-      'export OCX_TOOL_FOO="bar"',
-    ].join("\n");
+    const text = ['export PATH="/a/b:/c/d:${PATH}"', 'export OCX_TOOL_FOO="bar"'].join("\n");
     applyShellExports(text, "bash");
     const sep = process.platform === "win32" ? ";" : ":";
     if (sep === ":") {
-      expect(addPathMock).toHaveBeenCalledWith("/a/b");
-      expect(addPathMock).toHaveBeenCalledWith("/c/d");
+      expect(coreMocks.addPath).toHaveBeenCalledWith("/a/b");
+      expect(coreMocks.addPath).toHaveBeenCalledWith("/c/d");
     }
-    expect(exportVariableMock).toHaveBeenCalledWith("OCX_TOOL_FOO", "bar");
+    expect(coreMocks.exportVariable).toHaveBeenCalledWith("OCX_TOOL_FOO", "bar");
   });
 
   test("ignores blank lines and comments", () => {
-    const text = "# header\n\n   \nexport FOO=\"bar\"";
+    const text = '# header\n\n   \nexport FOO="bar"';
     applyShellExports(text, "bash");
-    expect(exportVariableMock).toHaveBeenCalledTimes(1);
+    expect(coreMocks.exportVariable).toHaveBeenCalledTimes(1);
   });
 
   test("parses unquoted bash values", () => {
     const text = "export FOO=baz";
     applyShellExports(text, "bash");
-    expect(exportVariableMock).toHaveBeenCalledWith("FOO", "baz");
+    expect(coreMocks.exportVariable).toHaveBeenCalledWith("FOO", "baz");
   });
 
   test("parses powershell exports", () => {
-    const text = [
-      '$env:OCX_TOOL_FOO = "bar"',
-      '$env:PATH = "C:\\a;C:\\b;$env:PATH"',
-    ].join("\n");
+    const text = ['$env:OCX_TOOL_FOO = "bar"', '$env:PATH = "C:\\a;C:\\b;$env:PATH"'].join("\n");
     applyShellExports(text, "powershell");
-    expect(exportVariableMock).toHaveBeenCalledWith("OCX_TOOL_FOO", "bar");
+    expect(coreMocks.exportVariable).toHaveBeenCalledWith("OCX_TOOL_FOO", "bar");
   });
 });
 
 describe("readToolchainInputs", () => {
-  beforeEach(() => {
-    getInputValues = {};
-    booleanInputValues = {};
-    warningMock.mockClear();
-  });
-
   test("returns null when toolchain input is empty (opt-out)", () => {
-    getInputValues = { toolchain: "" };
+    inputState.inputs = { toolchain: "" };
     expect(readToolchainInputs()).toBeNull();
   });
 
   test("returns null when toolchain file does not exist", () => {
     const dir = tempDir();
-    getInputValues = { toolchain: "ocx.toml", "working-directory": dir };
+    inputState.inputs = { toolchain: "ocx.toml", "working-directory": dir };
     try {
       expect(readToolchainInputs()).toBeNull();
     } finally {
@@ -160,13 +92,13 @@ describe("readToolchainInputs", () => {
     const dir = tempDir();
     fs.writeFileSync(path.join(dir, "ocx.toml"), "[tools]\n");
     fs.writeFileSync(path.join(dir, "ocx.lock"), "x");
-    getInputValues = {
+    inputState.inputs = {
       toolchain: "ocx.toml",
       "working-directory": dir,
       groups: "ci,lint",
       "cache-suffix": "v1",
     };
-    booleanInputValues = { cache: true };
+    inputState.booleanInputs = { cache: true };
     try {
       const cfg = readToolchainInputs();
       expect(cfg).not.toBeNull();
@@ -184,12 +116,12 @@ describe("readToolchainInputs", () => {
   test("warns when ocx.toml present but ocx.lock missing", () => {
     const dir = tempDir();
     fs.writeFileSync(path.join(dir, "ocx.toml"), "[tools]\n");
-    getInputValues = { toolchain: "ocx.toml", "working-directory": dir };
-    booleanInputValues = { cache: true };
+    inputState.inputs = { toolchain: "ocx.toml", "working-directory": dir };
+    inputState.booleanInputs = { cache: true };
     try {
       const cfg = readToolchainInputs();
       expect(cfg).not.toBeNull();
-      expect(warningMock).toHaveBeenCalled();
+      expect(coreMocks.warning).toHaveBeenCalled();
     } finally {
       fs.rmSync(dir, { recursive: true });
     }
@@ -200,12 +132,12 @@ describe("readToolchainInputs", () => {
     const home = tempDir();
     fs.writeFileSync(path.join(dir, "ocx.toml"), "");
     fs.writeFileSync(path.join(dir, "ocx.lock"), "");
-    getInputValues = {
+    inputState.inputs = {
       toolchain: "ocx.toml",
       "working-directory": dir,
       "ocx-home": home,
     };
-    booleanInputValues = { cache: true };
+    inputState.booleanInputs = { cache: true };
     try {
       const cfg = readToolchainInputs();
       expect(cfg!.ocxHome).toBe(home);
@@ -217,20 +149,6 @@ describe("readToolchainInputs", () => {
 });
 
 describe("loadToolchain", () => {
-  beforeEach(() => {
-    execCalls.length = 0;
-    exportVariableMock.mockClear();
-    addPathMock.mockClear();
-    saveStateMock.mockClear();
-    isFeatureAvailableMock.mockClear();
-    restoreCacheMock.mockClear();
-    saveCacheMock.mockClear();
-    envOutput = 'export PATH="/opt/bun/bin:${PATH}"\nexport BUN_VERSION="1.3"\n';
-    // Default: cache feature unavailable — restoreObjectStoreCache returns
-    // hit=false without exercising @actions/cache.
-    isFeatureAvailableMock.mockImplementation(() => false);
-  });
-
   test("exports OCX_HOME and runs pull + env", async () => {
     const dir = tempDir();
     const home = tempDir();
@@ -251,9 +169,9 @@ describe("loadToolchain", () => {
           cacheSuffix: "",
         },
       });
-      expect(exportVariableMock).toHaveBeenCalledWith("OCX_HOME", home);
-      expect(execCalls[0].args).toEqual(["--project", path.join(dir, "ocx.toml"), "pull"]);
-      expect(execCalls[1].args.slice(0, 3)).toEqual([
+      expect(coreMocks.exportVariable).toHaveBeenCalledWith("OCX_HOME", home);
+      expect(execCalls[0]?.args).toEqual(["--project", path.join(dir, "ocx.toml"), "pull"]);
+      expect(execCalls[1]?.args.slice(0, 3)).toEqual([
         "--project",
         path.join(dir, "ocx.toml"),
         "env",
@@ -285,7 +203,7 @@ describe("loadToolchain", () => {
         },
       });
       const pull = execCalls.find((c) => c.args.includes("pull"));
-      expect(pull!.args).toEqual([
+      expect(pull?.args).toEqual([
         "--project",
         path.join(dir, "ocx.toml"),
         "pull",
@@ -318,13 +236,14 @@ describe("loadToolchain", () => {
           cacheSuffix: "",
         },
       });
-      // Real buildCacheKey produces deterministic shape including os/arch.
       const expectedKeyPrefix = `setup-ocx-store-${process.platform}-${process.arch}-gnu-ocx0.3.1-`;
-      const cacheKeyCall = saveStateMock.mock.calls.find((c: unknown[]) => c[0] === "cache-key");
+      const cacheKeyCall = coreMocks.saveState.mock.calls.find(
+        (c: unknown[]) => c[0] === "cache-key",
+      );
       expect(cacheKeyCall).toBeDefined();
       expect(cacheKeyCall![1] as string).toContain(expectedKeyPrefix);
-      expect(saveStateMock).toHaveBeenCalledWith("ocx-home", home);
-      expect(saveStateMock).toHaveBeenCalledWith("cache-hit", "false");
+      expect(coreMocks.saveState).toHaveBeenCalledWith("ocx-home", home);
+      expect(coreMocks.saveState).toHaveBeenCalledWith("cache-hit", "false");
     } finally {
       fs.rmSync(dir, { recursive: true });
       fs.rmSync(home, { recursive: true });
@@ -351,8 +270,8 @@ describe("loadToolchain", () => {
           cacheSuffix: "",
         },
       });
-      expect(restoreCacheMock).not.toHaveBeenCalled();
-      expect(saveStateMock).not.toHaveBeenCalled();
+      expect(cacheMocks.restoreCache).not.toHaveBeenCalled();
+      expect(coreMocks.saveState).not.toHaveBeenCalled();
     } finally {
       fs.rmSync(dir, { recursive: true });
       fs.rmSync(home, { recursive: true });
@@ -383,7 +302,7 @@ describe("loadToolchain", () => {
         },
       });
       const envCall = execCalls.find((c) => c.args.includes("env"));
-      expect(envCall!.args).toContain("--shell=powershell");
+      expect(envCall?.args).toContain("--shell=powershell");
     } finally {
       Object.defineProperty(process, "platform", { value: oldPlatform });
       fs.rmSync(dir, { recursive: true });

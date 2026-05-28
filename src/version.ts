@@ -1,16 +1,12 @@
 import * as core from "@actions/core";
 import { HttpClient } from "@actions/http-client";
-import type { TypedResponse } from "@actions/http-client/lib/interfaces";
-import { REPO_OWNER, REPO_NAME } from "./constants";
+import { REPO_OWNER, REPO_NAME } from "./constants.js";
+import { parseRetryAfterMs, withRetry } from "./http-retry.js";
+import type { Decision, Outcome } from "./http-retry.js";
 
 interface GitHubRelease {
   tag_name: string;
 }
-
-const MAX_ATTEMPTS = 3;
-const BACKOFF_MS = [500, 1500, 4500];
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function resolveVersion(version: string, token: string): Promise<string> {
   if (version !== "latest") {
@@ -24,54 +20,51 @@ export async function resolveVersion(version: string, token: string): Promise<st
     Accept: "application/vnd.github.v3+json",
   };
   if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+    headers.Authorization = `Bearer ${token}`;
   }
 
   const url = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`;
   core.debug(`API URL: ${url}`);
 
-  const attempts: string[] = [];
-
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    let response: TypedResponse<GitHubRelease> | undefined;
-    let thrown: unknown;
-    try {
-      response = await client.getJson<GitHubRelease>(url, headers);
-    } catch (error) {
-      thrown = error;
-    }
-
-    if (thrown) {
-      const msg = thrown instanceof Error ? thrown.message : String(thrown);
-      attempts.push(`attempt ${attempt + 1}: error ${msg}`);
-    } else if (!response) {
-      // unreachable, here for type narrowing
-      attempts.push(`attempt ${attempt + 1}: no response`);
-    } else if (response.statusCode >= 500) {
-      attempts.push(`attempt ${attempt + 1}: HTTP ${response.statusCode}`);
-    } else if (!response.result?.tag_name) {
-      attempts.push(
-        `attempt ${attempt + 1}: HTTP ${response.statusCode} with empty release body`,
-      );
-    } else {
-      const resolved = response.result.tag_name.replace(/^v/, "");
-      if (attempt > 0) {
-        core.info(`Resolved after ${attempt + 1} attempts.`);
+  const resolved = await withRetry<string>(
+    async (): Promise<Outcome<string>> => {
+      try {
+        const response = await client.getJson<GitHubRelease>(url, headers);
+        const out: Outcome<string> = {
+          response: {
+            statusCode: response.statusCode,
+            headers: response.headers,
+          },
+        };
+        const tag = response.result?.tag_name.replace(/^v/, "");
+        if (tag) out.result = tag;
+        return out;
+      } catch (error) {
+        return { error };
       }
-      core.info(`Resolved latest version: ${resolved}`);
-      return resolved;
-    }
-
-    if (attempt < MAX_ATTEMPTS - 1) {
-      const delay = BACKOFF_MS[attempt];
-      core.warning(
-        `Failed to resolve latest OCX version (${attempts[attempts.length - 1]}); retrying in ${delay}ms`,
-      );
-      await sleep(delay);
-    }
-  }
-
-  throw new Error(
-    `Failed to resolve latest OCX version after ${MAX_ATTEMPTS} attempts: ${attempts.join("; ")}`,
+    },
+    (outcome): Decision => {
+      if (outcome.error !== undefined) {
+        const msg =
+          outcome.error instanceof Error ? outcome.error.message : JSON.stringify(outcome.error);
+        return { kind: "retry", reason: `network error ${msg}` };
+      }
+      const status = outcome.response?.statusCode ?? 0;
+      const retryAfterMs = parseRetryAfterMs(outcome.response?.headers?.["retry-after"]);
+      const retryDecision = (reason: string): Decision =>
+        retryAfterMs !== undefined
+          ? { kind: "retry", reason, retryAfterMs }
+          : { kind: "retry", reason };
+      if (status >= 500) return retryDecision(`HTTP ${status}`);
+      if (status === 408 || status === 429) return retryDecision(`HTTP ${status}`);
+      if (status >= 400) return { kind: "fail", reason: `HTTP ${status}` };
+      if (!outcome.result)
+        return { kind: "retry", reason: `HTTP ${status} with empty release body` };
+      return { kind: "success" };
+    },
+    { label: "resolve latest OCX version" },
   );
+
+  core.info(`Resolved latest version: ${resolved}`);
+  return resolved;
 }

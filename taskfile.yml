@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://taskfile.dev/schema.json
-version: '3'
+version: "3"
 
 # Tool versions live in ocx.toml. Locally direnv supplies PATH via .envrc;
 # in CI ocx-sh/setup-ocx supplies PATH. Tasks call binaries directly.
@@ -31,10 +31,32 @@ tasks:
     desc: Run unit tests in watch mode
     cmd: bun test --watch
 
+  test:coverage:
+    desc: Run tests with coverage (writes coverage/lcov.info)
+    cmd: bun run test:coverage
+
+  lint:
+    desc: Lint TypeScript sources
+    cmd: bun run lint
+
+  lint:fix:
+    desc: Lint and auto-fix where possible
+    cmd: bun run lint:fix
+
+  fmt:
+    desc: Format the repo with Prettier
+    cmd: bun run fmt
+
+  fmt:check:
+    desc: Verify formatting (CI gate)
+    cmd: bun run fmt:check
+
   check:
-    desc: Run all checks (test, build, dist freshness)
+    desc: Run all checks (format, lint, coverage, build, dist freshness)
     cmds:
-      - task: test
+      - task: fmt:check
+      - task: lint
+      - task: test:coverage
       - task: build
       - task: dist:check
 
@@ -53,12 +75,12 @@ tasks:
         msg: Working tree must be clean
     vars:
       VERSION:
-        sh: 'git-cliff --bumped-version'
+        sh: "git-cliff --bumped-version"
     cmds:
-      - 'git-cliff --bump --output CHANGELOG.md'
-      - 'git add CHANGELOG.md'
+      - "git-cliff --bump --output CHANGELOG.md"
+      - "git add CHANGELOG.md"
       - 'git commit -m "release: {{.VERSION}}"'
-      - 'git tag {{.VERSION}}'
+      - "git tag {{.VERSION}}"
       - |
         echo ""
         echo "Release prepared ({{.VERSION}}). Review changes, then:"

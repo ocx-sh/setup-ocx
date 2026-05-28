@@ -1,61 +1,34 @@
-import { describe, test, expect, mock, beforeEach } from "bun:test";
-import * as fs from "fs";
-import * as os from "os";
-import * as path from "path";
-
-const infoMock = mock(() => {});
-const warningMock = mock(() => {});
-
-mock.module("@actions/core", () => ({
-  info: infoMock,
-  debug: mock(() => {}),
-  warning: warningMock,
-  getInput: mock(() => ""),
-  getBooleanInput: mock(() => false),
-  setOutput: mock(() => {}),
-  setFailed: mock(() => {}),
-  addPath: mock(() => {}),
-  exportVariable: mock(() => {}),
-  isDebug: mock(() => false),
-  saveState: mock(() => {}),
-  group: mock(async (_name: string, fn: () => Promise<unknown>) => fn()),
-  summary: {
-    addHeading: mock(function (this: unknown) { return this; }),
-    addTable: mock(function (this: unknown) { return this; }),
-    write: mock(() => Promise.resolve({ filePath: "" })),
-  },
-}));
-
-const isFeatureAvailableMock = mock(() => true);
-const restoreCacheMock = mock(
-  (_paths: string[], _key: string, _alt?: string[]) =>
-    Promise.resolve(undefined as string | undefined),
-);
-const saveCacheMock = mock((_paths: string[], _key: string) => Promise.resolve(0));
-
-mock.module("@actions/cache", () => ({
-  isFeatureAvailable: isFeatureAvailableMock,
-  restoreCache: restoreCacheMock,
-  saveCache: saveCacheMock,
-}));
-
-const {
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { cacheMocks, coreMocks, resetMocks } from "./setup-mocks.js";
+import {
   CACHED_DIRS,
   buildCacheKey,
-  restoreKeys,
   hashFile,
+  restoreKeys,
   restoreObjectStoreCache,
   saveObjectStoreCache,
-} = await import("../src/cache");
+} from "../src/cache.js";
 
 function tempDir(): string {
   const dir = path.join(
     os.tmpdir(),
-    `test-cache-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    `test-cache-${Date.now().toString()}-${Math.random().toString(36).slice(2)}`,
   );
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
+
+beforeEach(() => {
+  resetMocks();
+  cacheMocks.isFeatureAvailable.mockImplementation(() => true);
+});
+
+afterEach(() => {
+  mock.restore();
+});
 
 describe("CACHED_DIRS", () => {
   test("caches the four CAS-flavored dirs and nothing else", () => {
@@ -124,11 +97,19 @@ describe("buildCacheKey", () => {
     const lock = path.join(dir, "ocx.lock");
     fs.writeFileSync(lock, "a");
     const k1 = buildCacheKey({
-      ocxHome: dir, lockFile: lock, ocxVersion: "0.3.1", libc: "gnu", cacheSuffix: "",
+      ocxHome: dir,
+      lockFile: lock,
+      ocxVersion: "0.3.1",
+      libc: "gnu",
+      cacheSuffix: "",
     });
     fs.writeFileSync(lock, "b");
     const k2 = buildCacheKey({
-      ocxHome: dir, lockFile: lock, ocxVersion: "0.3.1", libc: "gnu", cacheSuffix: "",
+      ocxHome: dir,
+      lockFile: lock,
+      ocxVersion: "0.3.1",
+      libc: "gnu",
+      cacheSuffix: "",
     });
     fs.rmSync(dir, { recursive: true });
     expect(k1).not.toBe(k2);
@@ -142,7 +123,11 @@ describe("restoreKeys", () => {
     fs.writeFileSync(lock, "x");
     try {
       const fallbacks = restoreKeys({
-        ocxHome: dir, lockFile: lock, ocxVersion: "0.3.1", libc: "gnu", cacheSuffix: "",
+        ocxHome: dir,
+        lockFile: lock,
+        ocxVersion: "0.3.1",
+        libc: "gnu",
+        cacheSuffix: "",
       });
       expect(fallbacks.length).toBeGreaterThan(0);
       expect(fallbacks[fallbacks.length - 1]).toBe(
@@ -155,26 +140,22 @@ describe("restoreKeys", () => {
 });
 
 describe("restoreObjectStoreCache", () => {
-  beforeEach(() => {
-    isFeatureAvailableMock.mockClear();
-    restoreCacheMock.mockClear();
-    saveCacheMock.mockClear();
-    warningMock.mockClear();
-    infoMock.mockClear();
-    isFeatureAvailableMock.mockImplementation(() => true);
-    restoreCacheMock.mockImplementation(() => Promise.resolve(undefined));
-  });
-
   test("creates the cached dirs then calls restoreCache with the four paths", async () => {
     const dir = tempDir();
     const lock = path.join(dir, "ocx.lock");
     fs.writeFileSync(lock, "x");
     try {
       await restoreObjectStoreCache({
-        ocxHome: dir, lockFile: lock, ocxVersion: "0.3.1", libc: "gnu", cacheSuffix: "",
+        ocxHome: dir,
+        lockFile: lock,
+        ocxVersion: "0.3.1",
+        libc: "gnu",
+        cacheSuffix: "",
       });
-      const [paths] = restoreCacheMock.mock.calls[0];
-      const names = (paths as string[]).map((p) => path.basename(p));
+      const call = cacheMocks.restoreCache.mock.calls[0];
+      expect(call).toBeDefined();
+      const paths = call![0];
+      const names = paths.map((p: string) => path.basename(p));
       expect(names).toEqual(["blobs", "layers", "packages", "tags"]);
       for (const sub of ["blobs", "layers", "packages", "tags"]) {
         expect(fs.existsSync(path.join(dir, sub))).toBe(true);
@@ -189,11 +170,13 @@ describe("restoreObjectStoreCache", () => {
     const lock = path.join(dir, "ocx.lock");
     fs.writeFileSync(lock, "x");
     try {
-      restoreCacheMock.mockImplementation(
-        async (_paths: string[], key: string) => key,
-      );
+      cacheMocks.restoreCache.mockImplementation(async (_paths, key) => Promise.resolve(key));
       const result = await restoreObjectStoreCache({
-        ocxHome: dir, lockFile: lock, ocxVersion: "0.3.1", libc: "gnu", cacheSuffix: "",
+        ocxHome: dir,
+        lockFile: lock,
+        ocxVersion: "0.3.1",
+        libc: "gnu",
+        cacheSuffix: "",
       });
       expect(result.hit).toBe(true);
       expect(result.matchedKey).toBe(result.key);
@@ -207,11 +190,15 @@ describe("restoreObjectStoreCache", () => {
     const lock = path.join(dir, "ocx.lock");
     fs.writeFileSync(lock, "x");
     try {
-      restoreCacheMock.mockImplementation(
-        async (_paths: string[], _key: string, alt?: string[]) => alt?.[0],
+      cacheMocks.restoreCache.mockImplementation(async (_paths, _key, alt) =>
+        Promise.resolve(alt?.[0]),
       );
       const result = await restoreObjectStoreCache({
-        ocxHome: dir, lockFile: lock, ocxVersion: "0.3.1", libc: "gnu", cacheSuffix: "",
+        ocxHome: dir,
+        lockFile: lock,
+        ocxVersion: "0.3.1",
+        libc: "gnu",
+        cacheSuffix: "",
       });
       expect(result.hit).toBe(false);
       expect(result.matchedKey).toBeDefined();
@@ -224,14 +211,18 @@ describe("restoreObjectStoreCache", () => {
     const dir = tempDir();
     const lock = path.join(dir, "ocx.lock");
     fs.writeFileSync(lock, "x");
-    isFeatureAvailableMock.mockImplementation(() => false);
+    cacheMocks.isFeatureAvailable.mockImplementation(() => false);
     try {
       const result = await restoreObjectStoreCache({
-        ocxHome: dir, lockFile: lock, ocxVersion: "0.3.1", libc: "gnu", cacheSuffix: "",
+        ocxHome: dir,
+        lockFile: lock,
+        ocxVersion: "0.3.1",
+        libc: "gnu",
+        cacheSuffix: "",
       });
       expect(result.hit).toBe(false);
-      expect(restoreCacheMock).not.toHaveBeenCalled();
-      expect(warningMock).toHaveBeenCalled();
+      expect(cacheMocks.restoreCache).not.toHaveBeenCalled();
+      expect(coreMocks.warning).toHaveBeenCalled();
     } finally {
       fs.rmSync(dir, { recursive: true });
     }
@@ -239,31 +230,30 @@ describe("restoreObjectStoreCache", () => {
 });
 
 describe("saveObjectStoreCache", () => {
-  beforeEach(() => {
-    saveCacheMock.mockClear();
-    warningMock.mockClear();
-    isFeatureAvailableMock.mockImplementation(() => true);
-  });
-
   test("calls saveCache with the four cached dirs", async () => {
     const dir = "/tmp/ocx-home";
     await saveObjectStoreCache(dir, "my-key");
-    const [paths, key] = saveCacheMock.mock.calls[0];
-    expect((paths as string[]).map((p) => path.basename(p))).toEqual([
-      "blobs", "layers", "packages", "tags",
+    const call = cacheMocks.saveCache.mock.calls[0];
+    expect(call).toBeDefined();
+    const [paths, key] = call!;
+    expect(paths.map((p: string) => path.basename(p))).toEqual([
+      "blobs",
+      "layers",
+      "packages",
+      "tags",
     ]);
     expect(key).toBe("my-key");
   });
 
   test("swallows errors into warnings", async () => {
-    saveCacheMock.mockImplementation(() => Promise.reject(new Error("nope")));
+    cacheMocks.saveCache.mockImplementation(() => Promise.reject(new Error("nope")));
     await saveObjectStoreCache("/tmp/ocx-home", "my-key");
-    expect(warningMock).toHaveBeenCalled();
+    expect(coreMocks.warning).toHaveBeenCalled();
   });
 
   test("skips when cache feature unavailable", async () => {
-    isFeatureAvailableMock.mockImplementation(() => false);
+    cacheMocks.isFeatureAvailable.mockImplementation(() => false);
     await saveObjectStoreCache("/tmp/ocx-home", "my-key");
-    expect(saveCacheMock).not.toHaveBeenCalled();
+    expect(cacheMocks.saveCache).not.toHaveBeenCalled();
   });
 });
