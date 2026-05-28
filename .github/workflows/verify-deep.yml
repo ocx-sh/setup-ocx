@@ -30,7 +30,7 @@ jobs:
           libc: ${{ matrix.libc || '' }}
       - name: Verify binary
         shell: bash
-        run: ocx --version
+        run: ocx version
       - name: Verify toolchain activation
         shell: bash
         run: |

@@ -3,7 +3,7 @@ lock_version = 1
 declaration_hash_version = 1
 declaration_hash = "sha256:37686f1020192de1a8911e655f150665f2006a07b5d86cfd307b2abc99edbf71"
 generated_by = "ocx 0.3.1"
-generated_at = "2026-05-28T14:50:50Z"
+generated_at = "2026-05-28T14:59:21Z"
 
 [[tool]]
 name = "bun"
@@ -23,4 +23,4 @@ pinned = "ocx.sh/go-task@sha256:fcfad89eae0672b309b5bcc7bb25e592cab244296dd98852
 [[tool]]
 name = "nodejs"
 group = "default"
-pinned = "ocx.sh/nodejs@sha256:3bf3222f1b0fc2665f5d81c12480ef8ec72807b476b22b02176ebbc0302ca613"
+pinned = "ocx.sh/nodejs@sha256:5f0b5f190035ba11de413c37d7ca1ff6aef8dab20d1b4d2868ee5d68c831ca40"

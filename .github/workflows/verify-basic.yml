@@ -22,7 +22,7 @@ jobs:
           node --version
           task --version
           git-cliff --version
-          ocx --version
+          ocx version
       - run: task install
       - run: task check
       - name: Verify outputs
@@ -51,7 +51,7 @@ jobs:
         env:
           TC_LOADED: ${{ steps.setup.outputs.toolchain-loaded }}
         run: |
-          ocx --version
+          ocx version
           test "$TC_LOADED" = "false"
           if command -v bun >/dev/null 2>&1; then
             echo "bun unexpectedly on PATH"
