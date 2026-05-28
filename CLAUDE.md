@@ -34,13 +34,13 @@ Source modules in `src/` are bundled into two artifacts by `esbuild`: `dist/setu
 
 | Module          | Responsibility                                                                                                   |
 | --------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `setup.ts`      | Main entry — reads inputs, orchestrates resolve → download → cache → toolchain activation                        |
+| `setup.ts`      | Main entry — reads inputs, orchestrates resolve → download → cache → project activation                          |
 | `save-cache.ts` | Post entry — saves binary + object-store caches deferred by the main step                                        |
 | `version.ts`    | Resolves `"latest"` to a concrete version via the GitHub Releases API (with retry)                               |
 | `constants.ts`  | Maps Node.js `platform`/`arch` to Rust target triples; detects musl vs gnu libc                                  |
 | `download.ts`   | Downloads archive, verifies SHA256, extracts, caches binary (overlays `@actions/cache` over `RUNNER_TOOL_CACHE`) |
 | `cache.ts`      | `$OCX_HOME` object store cache (selective dirs, lockfile-hash key)                                               |
-| `toolchain.ts`  | Discovers `ocx.toml`, runs `ocx pull`, parses `ocx env`, exports PATH                                            |
+| `project.ts`    | Discovers `ocx.toml`, runs `ocx pull`, parses `ocx env`, exports PATH                                            |
 | `http-retry.ts` | Generic `withRetry()` helper — exponential backoff + Retry-After support                                         |
 
 The `dist/` directory **is committed** — GitHub Actions require it. After any source change, run `task build` and commit both bundles. CI (`task dist:check`) will fail if either bundle is stale.

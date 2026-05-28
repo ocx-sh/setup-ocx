@@ -64,20 +64,20 @@ describe("setup", () => {
     expect(coreMocks.setOutput).toHaveBeenCalledWith("cache-hit", "true");
   });
 
-  test("sets toolchain outputs to false when no ocx.toml present", async () => {
+  test("sets project outputs to false when no ocx.toml present", async () => {
     inputState.inputs = {
       version: "latest",
       "github-token": "",
       libc: "",
-      toolchain: "ocx.toml",
+      project: "ocx.toml",
       "working-directory": makeTempDir(),
     };
     await run();
-    expect(coreMocks.setOutput).toHaveBeenCalledWith("toolchain-loaded", "false");
-    expect(coreMocks.setOutput).toHaveBeenCalledWith("toolchain-cache-hit", "false");
+    expect(coreMocks.setOutput).toHaveBeenCalledWith("project-loaded", "false");
+    expect(coreMocks.setOutput).toHaveBeenCalledWith("project-cache-hit", "false");
   });
 
-  test("activates toolchain when ocx.toml exists", async () => {
+  test("activates project when ocx.toml exists", async () => {
     const projDir = makeTempDir();
     fs.writeFileSync(path.join(projDir, "ocx.toml"), "[tools]\n");
     fs.writeFileSync(path.join(projDir, "ocx.lock"), "x");
@@ -85,28 +85,28 @@ describe("setup", () => {
       version: "latest",
       "github-token": "",
       libc: "gnu",
-      toolchain: "ocx.toml",
+      project: "ocx.toml",
       "working-directory": projDir,
     };
     inputState.booleanInputs = { cache: false };
     await run();
-    expect(coreMocks.setOutput).toHaveBeenCalledWith("toolchain-loaded", "true");
+    expect(coreMocks.setOutput).toHaveBeenCalledWith("project-loaded", "true");
     expect(execMocks.exec).toHaveBeenCalled();
     expect(coreMocks.exportVariable).toHaveBeenCalledWith("OCX_HOME", expect.any(String));
   });
 
-  test("toolchain disabled when toolchain input is empty", async () => {
+  test("project disabled when project input is empty", async () => {
     const projDir = makeTempDir();
     fs.writeFileSync(path.join(projDir, "ocx.toml"), "[tools]\n");
     inputState.inputs = {
       version: "latest",
       "github-token": "",
       libc: "",
-      toolchain: "",
+      project: "",
       "working-directory": projDir,
     };
     await run();
-    expect(coreMocks.setOutput).toHaveBeenCalledWith("toolchain-loaded", "false");
+    expect(coreMocks.setOutput).toHaveBeenCalledWith("project-loaded", "false");
     expect(execMocks.exec).not.toHaveBeenCalled();
   });
 

@@ -27,31 +27,31 @@ every locked tool on `PATH` — subsequent steps can invoke `bun`, `node`,
 
 ### Inputs
 
-| Input               | Description                                                                                                      | Default                   |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------- |
-| `version`           | OCX version to install (`"latest"` or exact like `"0.3.1"`)                                                      | `latest`                  |
-| `github-token`      | GitHub token for API requests and release downloads                                                              | `${{ github.token }}`     |
-| `libc`              | Linux C library variant (`"gnu"` or `"musl"`). Auto-detected if not set.                                         |                           |
-| `toolchain`         | Path to the project `ocx.toml` (relative to `working-directory`). Set to `''` to disable toolchain auto-load.    | `ocx.toml`                |
-| `working-directory` | Directory used to resolve `toolchain` and invoke ocx.                                                            | `${{ github.workspace }}` |
-| `groups`            | Comma-separated list of toolchain groups to pre-warm via `ocx pull -g`. Empty pulls every entry from `ocx.lock`. |                           |
-| `cache`             | Cache the OCX object store (`$OCX_HOME/{blobs,layers,packages,tags}`) and the ocx binary itself across runs.     | `true`                    |
-| `cache-suffix`      | Extra string appended to cache keys for manual busting.                                                          |                           |
-| `ocx-home`          | Overrides `$OCX_HOME`.                                                                                           | `~/.ocx`                  |
+| Input               | Description                                                                                                    | Default                   |
+| ------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `version`           | OCX version to install (`"latest"` or exact like `"0.3.1"`)                                                    | `latest`                  |
+| `github-token`      | GitHub token for API requests and release downloads                                                            | `${{ github.token }}`     |
+| `libc`              | Linux C library variant (`"gnu"` or `"musl"`). Auto-detected if not set.                                       |                           |
+| `project`           | Path to the project `ocx.toml` (relative to `working-directory`). Set to `''` to disable project auto-load.    | `ocx.toml`                |
+| `working-directory` | Directory used to resolve `project` and invoke ocx.                                                            | `${{ github.workspace }}` |
+| `groups`            | Comma-separated list of project groups to pre-warm via `ocx pull -g`. Empty pulls every entry from `ocx.lock`. |                           |
+| `cache`             | Cache the OCX object store (`$OCX_HOME/{blobs,layers,packages,tags}`) and the ocx binary itself across runs.   | `true`                    |
+| `cache-suffix`      | Extra string appended to cache keys for manual busting.                                                        |                           |
+| `ocx-home`          | Overrides `$OCX_HOME`.                                                                                         | `~/.ocx`                  |
 
 ### Outputs
 
-| Output                | Description                                                                |
-| --------------------- | -------------------------------------------------------------------------- |
-| `version`             | The installed OCX version                                                  |
-| `ocx-path`            | Path to the OCX binary directory                                           |
-| `cache-hit`           | Whether the OCX binary was restored from cache                             |
-| `toolchain-loaded`    | Whether a project toolchain was found and activated (`"true"` / `"false"`) |
-| `toolchain-cache-hit` | Whether the OCX object store was restored from cache for this toolchain    |
+| Output              | Description                                                           |
+| ------------------- | --------------------------------------------------------------------- |
+| `version`           | The installed OCX version                                             |
+| `ocx-path`          | Path to the OCX binary directory                                      |
+| `cache-hit`         | Whether the OCX binary was restored from cache                        |
+| `project-loaded`    | Whether an OCX project was found and activated (`"true"` / `"false"`) |
+| `project-cache-hit` | Whether the OCX object store was restored from cache for this project |
 
 ### Examples
 
-**Toolchain mode (recommended):**
+**Project mode (recommended):**
 
 Commit `ocx.toml` + `ocx.lock` to the repo, then:
 
@@ -63,14 +63,14 @@ steps:
   - run: bun test
 ```
 
-**Binary-only mode (no project toolchain):**
+**Binary-only mode (no project):**
 
 ```yaml
 steps:
   - uses: ocx-sh/setup-ocx@v1
     with:
-      toolchain: "" # explicit opt-out — only the ocx binary is installed
-  - run: ocx run nodejs:24 -- node --version
+      project: "" # explicit opt-out — only the ocx binary is installed
+  - run: ocx package exec nodejs:24 -- node --version
 ```
 
 **Pin OCX version and restrict to a group:**

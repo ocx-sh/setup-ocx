@@ -7,7 +7,7 @@ import { saveBinaryCache } from "./download.js";
  *
  * Two independent caches:
  *  - ocx binary tool-cache overlay (set by download.ts)
- *  - $OCX_HOME object store        (set by toolchain.ts)
+ *  - $OCX_HOME object store        (set by project.ts)
  *
  * On the exact-key hit path the main step records `cache-hit: true`; saving
  * is a no-op (the entry already exists). On the looser restore-key path
@@ -17,7 +17,7 @@ import { saveBinaryCache } from "./download.js";
  * Save failures degrade to warnings — they must never fail the user's job.
  */
 export async function run(): Promise<void> {
-  // 1. Toolchain object store.
+  // 1. Project object store.
   const tcKey = core.getState("cache-key");
   const ocxHome = core.getState("ocx-home");
   const tcHit = core.getState("cache-hit") === "true";

@@ -1,5 +1,5 @@
 name: "Setup OCX"
-description: "Install the OCX package manager and (optionally) activate a project toolchain from ocx.toml + ocx.lock"
+description: "Install the OCX package manager and (optionally) activate an OCX project from ocx.toml + ocx.lock"
 author: "ocx-sh"
 branding:
   icon: "package"
@@ -17,16 +17,16 @@ inputs:
     description: 'Linux C library variant ("gnu" or "musl"). Auto-detected if not specified.'
     required: false
     default: ""
-  toolchain:
-    description: "Path to the project ocx.toml (relative to working-directory). Set to an empty string to disable toolchain auto-load. When the file exists, the action runs `ocx pull` and activates the toolchain so subsequent steps can invoke the bound tools directly."
+  project:
+    description: "Path to the project ocx.toml (relative to working-directory). Set to an empty string to disable project auto-load. When the file exists, the action runs `ocx pull` and activates the project so subsequent steps can invoke the bound tools directly."
     required: false
     default: "ocx.toml"
   working-directory:
-    description: "Directory used to resolve `toolchain` and to invoke ocx. Defaults to the workflow workspace."
+    description: "Directory used to resolve `project` and to invoke ocx. Defaults to the workflow workspace."
     required: false
     default: ${{ github.workspace }}
   groups:
-    description: "Comma-separated list of toolchain groups to pre-warm via `ocx pull -g`. Empty (default) pulls every entry from ocx.lock."
+    description: "Comma-separated list of project groups to pre-warm via `ocx pull -g`. Empty (default) pulls every entry from ocx.lock."
     required: false
     default: ""
   cache:
@@ -48,10 +48,10 @@ outputs:
     description: "Path to the OCX binary directory"
   cache-hit:
     description: "Whether the OCX binary was restored from cache"
-  toolchain-loaded:
-    description: 'Whether a project toolchain was found and activated (`"true"` / `"false"`)'
-  toolchain-cache-hit:
-    description: "Whether the OCX object store was restored from the cache for this toolchain"
+  project-loaded:
+    description: 'Whether an OCX project was found and activated (`"true"` / `"false"`)'
+  project-cache-hit:
+    description: "Whether the OCX object store was restored from the cache for this project"
 runs:
   using: node24
   main: dist/setup/index.js

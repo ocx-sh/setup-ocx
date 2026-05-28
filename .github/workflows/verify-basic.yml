@@ -16,7 +16,7 @@ jobs:
       - name: Setup OCX
         id: setup
         uses: ./
-      - name: Verify toolchain activation
+      - name: Verify project activation
         run: |
           bun --version
           node --version
@@ -29,14 +29,14 @@ jobs:
         env:
           VERSION: ${{ steps.setup.outputs.version }}
           OCX_PATH: ${{ steps.setup.outputs.ocx-path }}
-          TC_LOADED: ${{ steps.setup.outputs.toolchain-loaded }}
+          PROJECT_LOADED: ${{ steps.setup.outputs.project-loaded }}
         run: |
           test -n "$VERSION"
           test -n "$OCX_PATH"
-          test "$TC_LOADED" = "true"
+          test "$PROJECT_LOADED" = "true"
 
-  toolchain-disabled:
-    name: Toolchain disabled (binary-only)
+  project-disabled:
+    name: Project disabled (binary-only)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -46,13 +46,13 @@ jobs:
         id: setup
         uses: ./
         with:
-          toolchain: ""
-      - name: Verify ocx works but toolchain is not activated
+          project: ""
+      - name: Verify ocx works but project is not activated
         env:
-          TC_LOADED: ${{ steps.setup.outputs.toolchain-loaded }}
+          PROJECT_LOADED: ${{ steps.setup.outputs.project-loaded }}
         run: |
           ocx version
-          test "$TC_LOADED" = "false"
+          test "$PROJECT_LOADED" = "false"
           if command -v bun >/dev/null 2>&1; then
             echo "bun unexpectedly on PATH"
             exit 1
@@ -76,11 +76,11 @@ jobs:
         env:
           VERSION: ${{ steps.setup.outputs.version }}
           OCX_PATH: ${{ steps.setup.outputs.ocx-path }}
-          TC_LOADED: ${{ steps.setup.outputs.toolchain-loaded }}
+          PROJECT_LOADED: ${{ steps.setup.outputs.project-loaded }}
         run: |
           test -n "$VERSION"
           test -n "$OCX_PATH"
-          test "$TC_LOADED" = "true"
+          test "$PROJECT_LOADED" = "true"
 
   lint:
     name: Lint + Format

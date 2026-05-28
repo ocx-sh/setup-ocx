@@ -36,7 +36,7 @@ jobs:
       - name: Verify binary
         shell: bash
         run: ocx version
-      - name: Verify toolchain activation
+      - name: Verify project activation
         shell: bash
         run: |
           bun --version
@@ -47,17 +47,17 @@ jobs:
           VERSION: ${{ steps.setup.outputs.version }}
           OCX_PATH: ${{ steps.setup.outputs.ocx-path }}
           CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}
-          TC_LOADED: ${{ steps.setup.outputs.toolchain-loaded }}
-          TC_CACHE_HIT: ${{ steps.setup.outputs.toolchain-cache-hit }}
+          PROJECT_LOADED: ${{ steps.setup.outputs.project-loaded }}
+          PROJECT_CACHE_HIT: ${{ steps.setup.outputs.project-cache-hit }}
         run: |
           echo "version=$VERSION"
           echo "ocx-path=$OCX_PATH"
           echo "cache-hit=$CACHE_HIT"
-          echo "toolchain-loaded=$TC_LOADED"
-          echo "toolchain-cache-hit=$TC_CACHE_HIT"
+          echo "project-loaded=$PROJECT_LOADED"
+          echo "project-cache-hit=$PROJECT_CACHE_HIT"
           test -n "$VERSION"
           test -n "$OCX_PATH"
-          test "$TC_LOADED" = "true"
+          test "$PROJECT_LOADED" = "true"
 
   verify-cache-hit:
     name: Verify cache hit (${{ matrix.os }}${{ matrix.libc && format(' {0}', matrix.libc) || '' }})
@@ -94,14 +94,14 @@ jobs:
         run: |
           echo "cache-hit=$CACHE_HIT"
           test "$CACHE_HIT" = "true"
-      - name: Assert toolchain cache hit
+      - name: Assert project cache hit
         shell: bash
         env:
-          TC_CACHE_HIT: ${{ steps.setup.outputs.toolchain-cache-hit }}
+          PROJECT_CACHE_HIT: ${{ steps.setup.outputs.project-cache-hit }}
         run: |
-          echo "toolchain-cache-hit=$TC_CACHE_HIT"
-          test "$TC_CACHE_HIT" = "true"
-      - name: Verify toolchain still activates from restored store
+          echo "project-cache-hit=$PROJECT_CACHE_HIT"
+          test "$PROJECT_CACHE_HIT" = "true"
+      - name: Verify project still activates from restored store
         shell: bash
         run: |
           bun --version

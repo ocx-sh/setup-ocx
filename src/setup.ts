@@ -3,7 +3,7 @@ import * as path from "node:path";
 import { detectLibc } from "./constants.js";
 import type { Libc } from "./constants.js";
 import { downloadOcx } from "./download.js";
-import { loadToolchain, readToolchainInputs } from "./toolchain.js";
+import { loadProject, readProjectInputs } from "./project.js";
 import { resolveVersion } from "./version.js";
 
 export async function run(): Promise<void> {
@@ -46,25 +46,25 @@ export async function run(): Promise<void> {
     core.setOutput("ocx-path", binDir);
     core.setOutput("cache-hit", cacheHit.toString());
 
-    // Phase 2: project toolchain activation (auto-loads when ocx.toml exists).
-    const tcInputs = readToolchainInputs();
-    let toolchainLoaded = false;
-    let toolchainCacheHit = false;
+    // Phase 2: project activation (auto-loads when ocx.toml exists).
+    const projectInputs = readProjectInputs();
+    let projectLoaded = false;
+    let projectCacheHit = false;
 
-    if (tcInputs) {
+    if (projectInputs) {
       const ocxBin = path.join(binDir, process.platform === "win32" ? "ocx.exe" : "ocx");
-      const result = await loadToolchain({
+      const result = await loadProject({
         ocxBin,
         ocxVersion: installedVersion,
         libc: libc ?? (process.platform === "linux" ? detectLibc() : ""),
-        inputs: tcInputs,
+        inputs: projectInputs,
       });
-      toolchainLoaded = true;
-      toolchainCacheHit = result.cacheHit;
+      projectLoaded = true;
+      projectCacheHit = result.cacheHit;
     }
 
-    core.setOutput("toolchain-loaded", toolchainLoaded ? "true" : "false");
-    core.setOutput("toolchain-cache-hit", toolchainCacheHit ? "true" : "false");
+    core.setOutput("project-loaded", projectLoaded ? "true" : "false");
+    core.setOutput("project-cache-hit", projectCacheHit ? "true" : "false");
 
     await core.summary
       .addHeading("OCX Setup", 3)
@@ -73,22 +73,20 @@ export async function run(): Promise<void> {
           { data: "Version", header: true },
           { data: "Path", header: true },
           { data: "Cache", header: true },
-          { data: "Toolchain", header: true },
+          { data: "Project", header: true },
         ],
         [
           installedVersion,
           binDir,
           cacheHit ? "Hit" : "Miss",
-          toolchainLoaded ? (toolchainCacheHit ? "Loaded (cache hit)" : "Loaded") : "—",
+          projectLoaded ? (projectCacheHit ? "Loaded (cache hit)" : "Loaded") : "—",
         ],
       ])
       .write();
 
     core.info(
       `OCX ${installedVersion} is ready (${binDir})${cacheHit ? " [cached]" : ""}` +
-        (toolchainLoaded
-          ? ` — toolchain activated${toolchainCacheHit ? " [store cache hit]" : ""}`
-          : ""),
+        (projectLoaded ? ` — project activated${projectCacheHit ? " [store cache hit]" : ""}` : ""),
     );
   } catch (error) {
     if (error instanceof Error) {

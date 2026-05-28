@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { cacheMocks, coreMocks, execMocks, inputState, resetMocks } from "./setup-mocks.js";
-import { applyShellExports, loadToolchain, readToolchainInputs } from "../src/toolchain.js";
+import { applyShellExports, loadProject, readProjectInputs } from "../src/project.js";
 
 interface ExecCall {
   bin: string;
@@ -35,7 +35,7 @@ afterEach(() => {
 function tempDir(): string {
   const dir = path.join(
     os.tmpdir(),
-    `test-toolchain-${Date.now().toString()}-${Math.random().toString(36).slice(2)}`,
+    `test-project-${Date.now().toString()}-${Math.random().toString(36).slice(2)}`,
   );
   fs.mkdirSync(dir, { recursive: true });
   return dir;
@@ -72,17 +72,17 @@ describe("applyShellExports", () => {
   });
 });
 
-describe("readToolchainInputs", () => {
-  test("returns null when toolchain input is empty (opt-out)", () => {
-    inputState.inputs = { toolchain: "" };
-    expect(readToolchainInputs()).toBeNull();
+describe("readProjectInputs", () => {
+  test("returns null when project input is empty (opt-out)", () => {
+    inputState.inputs = { project: "" };
+    expect(readProjectInputs()).toBeNull();
   });
 
-  test("returns null when toolchain file does not exist", () => {
+  test("returns null when project file does not exist", () => {
     const dir = tempDir();
-    inputState.inputs = { toolchain: "ocx.toml", "working-directory": dir };
+    inputState.inputs = { project: "ocx.toml", "working-directory": dir };
     try {
-      expect(readToolchainInputs()).toBeNull();
+      expect(readProjectInputs()).toBeNull();
     } finally {
       fs.rmSync(dir, { recursive: true });
     }
@@ -93,16 +93,16 @@ describe("readToolchainInputs", () => {
     fs.writeFileSync(path.join(dir, "ocx.toml"), "[tools]\n");
     fs.writeFileSync(path.join(dir, "ocx.lock"), "x");
     inputState.inputs = {
-      toolchain: "ocx.toml",
+      project: "ocx.toml",
       "working-directory": dir,
       groups: "ci,lint",
       "cache-suffix": "v1",
     };
     inputState.booleanInputs = { cache: true };
     try {
-      const cfg = readToolchainInputs();
+      const cfg = readProjectInputs();
       expect(cfg).not.toBeNull();
-      expect(cfg!.toolchainFile).toBe(path.join(dir, "ocx.toml"));
+      expect(cfg!.projectFile).toBe(path.join(dir, "ocx.toml"));
       expect(cfg!.lockFile).toBe(path.join(dir, "ocx.lock"));
       expect(cfg!.groups).toEqual(["ci", "lint"]);
       expect(cfg!.cacheEnabled).toBe(true);
@@ -116,10 +116,10 @@ describe("readToolchainInputs", () => {
   test("warns when ocx.toml present but ocx.lock missing", () => {
     const dir = tempDir();
     fs.writeFileSync(path.join(dir, "ocx.toml"), "[tools]\n");
-    inputState.inputs = { toolchain: "ocx.toml", "working-directory": dir };
+    inputState.inputs = { project: "ocx.toml", "working-directory": dir };
     inputState.booleanInputs = { cache: true };
     try {
-      const cfg = readToolchainInputs();
+      const cfg = readProjectInputs();
       expect(cfg).not.toBeNull();
       expect(coreMocks.warning).toHaveBeenCalled();
     } finally {
@@ -133,13 +133,13 @@ describe("readToolchainInputs", () => {
     fs.writeFileSync(path.join(dir, "ocx.toml"), "");
     fs.writeFileSync(path.join(dir, "ocx.lock"), "");
     inputState.inputs = {
-      toolchain: "ocx.toml",
+      project: "ocx.toml",
       "working-directory": dir,
       "ocx-home": home,
     };
     inputState.booleanInputs = { cache: true };
     try {
-      const cfg = readToolchainInputs();
+      const cfg = readProjectInputs();
       expect(cfg!.ocxHome).toBe(home);
     } finally {
       fs.rmSync(dir, { recursive: true });
@@ -148,20 +148,20 @@ describe("readToolchainInputs", () => {
   });
 });
 
-describe("loadToolchain", () => {
+describe("loadProject", () => {
   test("exports OCX_HOME and runs pull + env", async () => {
     const dir = tempDir();
     const home = tempDir();
     fs.writeFileSync(path.join(dir, "ocx.toml"), "[tools]\n");
     fs.writeFileSync(path.join(dir, "ocx.lock"), "x");
     try {
-      await loadToolchain({
+      await loadProject({
         ocxBin: "/usr/local/bin/ocx",
         ocxVersion: "0.3.1",
         libc: "gnu",
         inputs: {
           workingDirectory: dir,
-          toolchainFile: path.join(dir, "ocx.toml"),
+          projectFile: path.join(dir, "ocx.toml"),
           lockFile: path.join(dir, "ocx.lock"),
           groups: [],
           ocxHome: home,
@@ -188,13 +188,13 @@ describe("loadToolchain", () => {
     fs.writeFileSync(path.join(dir, "ocx.toml"), "");
     fs.writeFileSync(path.join(dir, "ocx.lock"), "");
     try {
-      await loadToolchain({
+      await loadProject({
         ocxBin: "/usr/local/bin/ocx",
         ocxVersion: "0.3.1",
         libc: "gnu",
         inputs: {
           workingDirectory: dir,
-          toolchainFile: path.join(dir, "ocx.toml"),
+          projectFile: path.join(dir, "ocx.toml"),
           lockFile: path.join(dir, "ocx.lock"),
           groups: ["ci", "lint"],
           ocxHome: home,
@@ -222,13 +222,13 @@ describe("loadToolchain", () => {
     fs.writeFileSync(path.join(dir, "ocx.toml"), "");
     fs.writeFileSync(path.join(dir, "ocx.lock"), "x");
     try {
-      await loadToolchain({
+      await loadProject({
         ocxBin: "/usr/local/bin/ocx",
         ocxVersion: "0.3.1",
         libc: "gnu",
         inputs: {
           workingDirectory: dir,
-          toolchainFile: path.join(dir, "ocx.toml"),
+          projectFile: path.join(dir, "ocx.toml"),
           lockFile: path.join(dir, "ocx.lock"),
           groups: [],
           ocxHome: home,
@@ -256,13 +256,13 @@ describe("loadToolchain", () => {
     fs.writeFileSync(path.join(dir, "ocx.toml"), "");
     fs.writeFileSync(path.join(dir, "ocx.lock"), "");
     try {
-      await loadToolchain({
+      await loadProject({
         ocxBin: "/usr/local/bin/ocx",
         ocxVersion: "0.3.1",
         libc: "gnu",
         inputs: {
           workingDirectory: dir,
-          toolchainFile: path.join(dir, "ocx.toml"),
+          projectFile: path.join(dir, "ocx.toml"),
           lockFile: path.join(dir, "ocx.lock"),
           groups: [],
           ocxHome: home,
@@ -287,13 +287,13 @@ describe("loadToolchain", () => {
     fs.writeFileSync(path.join(dir, "ocx.lock"), "");
     envOutput = '$env:PATH = "C:\\bun;$env:PATH"\n';
     try {
-      await loadToolchain({
+      await loadProject({
         ocxBin: "C:\\ocx\\ocx.exe",
         ocxVersion: "0.3.1",
         libc: "",
         inputs: {
           workingDirectory: dir,
-          toolchainFile: path.join(dir, "ocx.toml"),
+          projectFile: path.join(dir, "ocx.toml"),
           lockFile: path.join(dir, "ocx.lock"),
           groups: [],
           ocxHome: home,

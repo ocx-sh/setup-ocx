@@ -107952,7 +107952,7 @@ function findBinDir(dir) {
   return dir;
 }
 
-// src/toolchain.ts
+// src/project.ts
 var exec2 = __toESM(require_exec(), 1);
 var fs9 = __toESM(require("node:fs"), 1);
 var os8 = __toESM(require("node:os"), 1);
@@ -108015,22 +108015,22 @@ async function restoreObjectStoreCache(cfg) {
   }
 }
 
-// src/toolchain.ts
-function readToolchainInputs() {
-  const rawToolchain = getInput("toolchain");
-  if (!rawToolchain) {
+// src/project.ts
+function readProjectInputs() {
+  const rawProject = getInput("project");
+  if (!rawProject) {
     return null;
   }
   const workingDirectory = getInput("working-directory") || (process.env.GITHUB_WORKSPACE ?? process.cwd());
-  const toolchainFile = path8.isAbsolute(rawToolchain) ? rawToolchain : path8.join(workingDirectory, rawToolchain);
-  if (!fs9.existsSync(toolchainFile)) {
-    info(`No toolchain at ${toolchainFile} \u2014 skipping toolchain activation.`);
+  const projectFile = path8.isAbsolute(rawProject) ? rawProject : path8.join(workingDirectory, rawProject);
+  if (!fs9.existsSync(projectFile)) {
+    info(`No project at ${projectFile} \u2014 skipping project activation.`);
     return null;
   }
-  const lockFile = path8.join(path8.dirname(toolchainFile), "ocx.lock");
+  const lockFile = path8.join(path8.dirname(projectFile), "ocx.lock");
   if (!fs9.existsSync(lockFile)) {
     warning(
-      `Found ${toolchainFile} but no ocx.lock alongside it \u2014 \`ocx pull\` will fail. Run \`ocx lock\` locally and commit the result.`
+      `Found ${projectFile} but no ocx.lock alongside it \u2014 \`ocx pull\` will fail. Run \`ocx lock\` locally and commit the result.`
     );
   }
   const groups = getInput("groups").split(",").map((g) => g.trim()).filter(Boolean);
@@ -108040,7 +108040,7 @@ function readToolchainInputs() {
   const ocxHome = ocxHomeInput ? path8.resolve(ocxHomeInput) : path8.join(os8.homedir(), ".ocx");
   return {
     workingDirectory,
-    toolchainFile,
+    projectFile,
     lockFile,
     groups,
     ocxHome,
@@ -108048,7 +108048,7 @@ function readToolchainInputs() {
     cacheSuffix
   };
 }
-async function loadToolchain(args) {
+async function loadProject(args) {
   const { ocxBin, ocxVersion, libc, inputs } = args;
   exportVariable("OCX_HOME", inputs.ocxHome);
   fs9.mkdirSync(inputs.ocxHome, { recursive: true });
@@ -108067,7 +108067,7 @@ async function loadToolchain(args) {
     cacheHit = restored.hit;
   }
   await group("ocx pull", async () => {
-    const pullArgs = ["--project", inputs.toolchainFile, "pull"];
+    const pullArgs = ["--project", inputs.projectFile, "pull"];
     if (inputs.groups.length > 0) {
       pullArgs.push("-g", inputs.groups.join(","));
     }
@@ -108076,7 +108076,7 @@ async function loadToolchain(args) {
   await group("ocx env", async () => {
     const shellArg = process.platform === "win32" ? "powershell" : "bash";
     let envOutput = "";
-    await exec2.exec(ocxBin, ["--project", inputs.toolchainFile, "env", `--shell=${shellArg}`], {
+    await exec2.exec(ocxBin, ["--project", inputs.projectFile, "env", `--shell=${shellArg}`], {
       cwd: inputs.workingDirectory,
       listeners: {
         stdout: (data) => {
@@ -108274,38 +108274,38 @@ async function run() {
     setOutput("version", installedVersion);
     setOutput("ocx-path", binDir);
     setOutput("cache-hit", cacheHit.toString());
-    const tcInputs = readToolchainInputs();
-    let toolchainLoaded = false;
-    let toolchainCacheHit = false;
-    if (tcInputs) {
+    const projectInputs = readProjectInputs();
+    let projectLoaded = false;
+    let projectCacheHit = false;
+    if (projectInputs) {
       const ocxBin = path9.join(binDir, process.platform === "win32" ? "ocx.exe" : "ocx");
-      const result = await loadToolchain({
+      const result = await loadProject({
         ocxBin,
         ocxVersion: installedVersion,
         libc: libc ?? (process.platform === "linux" ? detectLibc() : ""),
-        inputs: tcInputs
+        inputs: projectInputs
       });
-      toolchainLoaded = true;
-      toolchainCacheHit = result.cacheHit;
+      projectLoaded = true;
+      projectCacheHit = result.cacheHit;
     }
-    setOutput("toolchain-loaded", toolchainLoaded ? "true" : "false");
-    setOutput("toolchain-cache-hit", toolchainCacheHit ? "true" : "false");
+    setOutput("project-loaded", projectLoaded ? "true" : "false");
+    setOutput("project-cache-hit", projectCacheHit ? "true" : "false");
     await summary.addHeading("OCX Setup", 3).addTable([
       [
         { data: "Version", header: true },
         { data: "Path", header: true },
         { data: "Cache", header: true },
-        { data: "Toolchain", header: true }
+        { data: "Project", header: true }
       ],
       [
         installedVersion,
         binDir,
         cacheHit ? "Hit" : "Miss",
-        toolchainLoaded ? toolchainCacheHit ? "Loaded (cache hit)" : "Loaded" : "\u2014"
+        projectLoaded ? projectCacheHit ? "Loaded (cache hit)" : "Loaded" : "\u2014"
       ]
     ]).write();
     info(
-      `OCX ${installedVersion} is ready (${binDir})${cacheHit ? " [cached]" : ""}` + (toolchainLoaded ? ` \u2014 toolchain activated${toolchainCacheHit ? " [store cache hit]" : ""}` : "")
+      `OCX ${installedVersion} is ready (${binDir})${cacheHit ? " [cached]" : ""}` + (projectLoaded ? ` \u2014 project activated${projectCacheHit ? " [store cache hit]" : ""}` : "")
     );
   } catch (error2) {
     if (error2 instanceof Error) {

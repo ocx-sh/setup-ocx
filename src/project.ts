@@ -6,9 +6,9 @@ import * as path from "node:path";
 import { buildCacheKey, restoreObjectStoreCache } from "./cache.js";
 import type { ObjectStoreCacheConfig } from "./cache.js";
 
-export interface ToolchainInputs {
+export interface ProjectInputs {
   workingDirectory: string;
-  toolchainFile: string; // absolute path to ocx.toml
+  projectFile: string; // absolute path to ocx.toml
   lockFile: string; // absolute path to ocx.lock
   groups: string[]; // [] = pass no -g
   ocxHome: string; // resolved absolute
@@ -16,47 +16,47 @@ export interface ToolchainInputs {
   cacheSuffix: string;
 }
 
-export interface LoadToolchainArgs {
+export interface LoadProjectArgs {
   ocxBin: string; // absolute path to the ocx executable
   ocxVersion: string;
   libc: string; // "gnu" | "musl" | "" for non-linux
-  inputs: ToolchainInputs;
+  inputs: ProjectInputs;
 }
 
-export interface LoadToolchainResult {
+export interface LoadProjectResult {
   cacheKey: string;
   cacheHit: boolean;
 }
 
 /**
- * Parse action inputs into a normalized toolchain configuration.
+ * Parse action inputs into a normalized project configuration.
  *
- * Returns null when the toolchain file does not exist — the action then
+ * Returns null when the project file does not exist — the action then
  * silently falls back to binary-only mode, which is the auto-load opt-out.
  */
-export function readToolchainInputs(): ToolchainInputs | null {
-  const rawToolchain = core.getInput("toolchain");
-  if (!rawToolchain) {
-    // Explicit opt-out: user set `toolchain: ''`.
+export function readProjectInputs(): ProjectInputs | null {
+  const rawProject = core.getInput("project");
+  if (!rawProject) {
+    // Explicit opt-out: user set `project: ''`.
     return null;
   }
 
   const workingDirectory =
     core.getInput("working-directory") || (process.env.GITHUB_WORKSPACE ?? process.cwd());
 
-  const toolchainFile = path.isAbsolute(rawToolchain)
-    ? rawToolchain
-    : path.join(workingDirectory, rawToolchain);
+  const projectFile = path.isAbsolute(rawProject)
+    ? rawProject
+    : path.join(workingDirectory, rawProject);
 
-  if (!fs.existsSync(toolchainFile)) {
-    core.info(`No toolchain at ${toolchainFile} — skipping toolchain activation.`);
+  if (!fs.existsSync(projectFile)) {
+    core.info(`No project at ${projectFile} — skipping project activation.`);
     return null;
   }
 
-  const lockFile = path.join(path.dirname(toolchainFile), "ocx.lock");
+  const lockFile = path.join(path.dirname(projectFile), "ocx.lock");
   if (!fs.existsSync(lockFile)) {
     core.warning(
-      `Found ${toolchainFile} but no ocx.lock alongside it — \`ocx pull\` will fail. Run \`ocx lock\` locally and commit the result.`,
+      `Found ${projectFile} but no ocx.lock alongside it — \`ocx pull\` will fail. Run \`ocx lock\` locally and commit the result.`,
     );
   }
 
@@ -74,7 +74,7 @@ export function readToolchainInputs(): ToolchainInputs | null {
 
   return {
     workingDirectory,
-    toolchainFile,
+    projectFile,
     lockFile,
     groups,
     ocxHome,
@@ -87,11 +87,11 @@ export function readToolchainInputs(): ToolchainInputs | null {
  * Activate the project toolchain:
  *   1. export OCX_HOME (overrides ~/.ocx so cache + future steps line up)
  *   2. optionally restore object store cache
- *   3. `ocx --project <toolchain> pull [-g ...]` — populate the store
- *   4. `ocx --project <toolchain> env --shell=bash|powershell` — apply env
+ *   3. `ocx --project <file> pull [-g ...]` — populate the store
+ *   4. `ocx --project <file> env --shell=bash|powershell` — apply env
  *   5. saveState for the post step
  */
-export async function loadToolchain(args: LoadToolchainArgs): Promise<LoadToolchainResult> {
+export async function loadProject(args: LoadProjectArgs): Promise<LoadProjectResult> {
   const { ocxBin, ocxVersion, libc, inputs } = args;
 
   core.exportVariable("OCX_HOME", inputs.ocxHome);
@@ -115,7 +115,7 @@ export async function loadToolchain(args: LoadToolchainArgs): Promise<LoadToolch
   }
 
   await core.group("ocx pull", async () => {
-    const pullArgs = ["--project", inputs.toolchainFile, "pull"];
+    const pullArgs = ["--project", inputs.projectFile, "pull"];
     if (inputs.groups.length > 0) {
       pullArgs.push("-g", inputs.groups.join(","));
     }
@@ -125,7 +125,7 @@ export async function loadToolchain(args: LoadToolchainArgs): Promise<LoadToolch
   await core.group("ocx env", async () => {
     const shellArg = process.platform === "win32" ? "powershell" : "bash";
     let envOutput = "";
-    await exec.exec(ocxBin, ["--project", inputs.toolchainFile, "env", `--shell=${shellArg}`], {
+    await exec.exec(ocxBin, ["--project", inputs.projectFile, "env", `--shell=${shellArg}`], {
       cwd: inputs.workingDirectory,
       listeners: {
         stdout: (data) => {

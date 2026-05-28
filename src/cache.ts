@@ -29,7 +29,7 @@ export interface ObjectStoreCacheConfig {
 /**
  * SHA256 of the file contents, hex encoded.
  * Returns `nolock` when the file is missing — keeps the cache key stable for
- * toolchains shipped without a lock (`ocx pull` will error before we ever
+ * projects shipped without a lock (`ocx pull` will error before we ever
  * read the cache, so the bogus key is harmless).
  */
 export function hashFile(filePath: string): string {
