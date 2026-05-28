@@ -17,16 +17,26 @@ const groupMock = mock(async (_name: string, fn: () => Promise<unknown>) => {
 let getInputValues: Record<string, string> = {};
 let booleanInputValues: Record<string, boolean> = {};
 
+// Full surface — bun's mock.module is process-global, so a missing key here
+// leaks to other test files whose source modules touch the missing function.
 mock.module("@actions/core", () => ({
   info: infoMock,
   debug: mock(() => {}),
   warning: warningMock,
   getInput: mock((name: string) => getInputValues[name] ?? ""),
   getBooleanInput: mock((name: string) => booleanInputValues[name] ?? false),
+  setOutput: mock(() => {}),
+  setFailed: mock(() => {}),
   exportVariable: exportVariableMock,
   addPath: addPathMock,
+  isDebug: mock(() => false),
   saveState: saveStateMock,
   group: groupMock,
+  summary: {
+    addHeading: mock(function (this: unknown) { return this; }),
+    addTable: mock(function (this: unknown) { return this; }),
+    write: mock(() => Promise.resolve({ filePath: "" })),
+  },
 }));
 
 interface ExecCall {
