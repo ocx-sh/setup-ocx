@@ -227,6 +227,52 @@ describe("restoreObjectStoreCache", () => {
       fs.rmSync(dir, { recursive: true });
     }
   });
+
+  test("swallows restoreCache errors into a warning and returns hit=false", async () => {
+    const dir = tempDir();
+    const lock = path.join(dir, "ocx.lock");
+    fs.writeFileSync(lock, "x");
+    cacheMocks.restoreCache.mockImplementation(() => Promise.reject(new Error("boom")));
+    try {
+      const result = await restoreObjectStoreCache({
+        ocxHome: dir,
+        lockFile: lock,
+        ocxVersion: "0.3.1",
+        libc: "gnu",
+        cacheSuffix: "",
+      });
+      expect(result.hit).toBe(false);
+      expect(result.matchedKey).toBeUndefined();
+      const warnings = coreMocks.warning.mock.calls.map((c: unknown[]) => String(c[0]));
+      expect(warnings.some((m: string) => m.includes("Failed to restore"))).toBe(true);
+    } finally {
+      fs.rmSync(dir, { recursive: true });
+    }
+  });
+
+  test("stringifies non-Error rejections in restore failure warning", async () => {
+    const dir = tempDir();
+    const lock = path.join(dir, "ocx.lock");
+    fs.writeFileSync(lock, "x");
+    cacheMocks.restoreCache.mockImplementation(() =>
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
+      Promise.reject("string-failure"),
+    );
+    try {
+      const result = await restoreObjectStoreCache({
+        ocxHome: dir,
+        lockFile: lock,
+        ocxVersion: "0.3.1",
+        libc: "gnu",
+        cacheSuffix: "",
+      });
+      expect(result.hit).toBe(false);
+      const warnings = coreMocks.warning.mock.calls.map((c: unknown[]) => String(c[0]));
+      expect(warnings.some((m: string) => m.includes("string-failure"))).toBe(true);
+    } finally {
+      fs.rmSync(dir, { recursive: true });
+    }
+  });
 });
 
 describe("saveObjectStoreCache", () => {

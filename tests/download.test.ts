@@ -217,6 +217,116 @@ describe("downloadOcx", () => {
     }
   });
 
+  test("falls through to download when overlay restores but tool-cache still misses", async () => {
+    const runnerToolCache = makeTempDir("test-runner-tc");
+    const oldEnv = process.env.RUNNER_TOOL_CACHE;
+    process.env.RUNNER_TOOL_CACHE = runnerToolCache;
+
+    const tmpDir = makeTempDir("test-download");
+    const archivePath = path.join(tmpDir, "archive.tar.xz");
+    const checksumPath = path.join(tmpDir, "archive.sha256");
+    const extractedDir = makeTempDir("test-extracted");
+    const cachedDir = makeTempDir("test-cached");
+
+    const archiveContent = Buffer.from("content");
+    fs.writeFileSync(archivePath, archiveContent);
+    const hash = crypto.createHash("sha256").update(archiveContent).digest("hex");
+    fs.writeFileSync(checksumPath, hash);
+
+    const subDir = path.join(extractedDir, "ocx-x86_64-unknown-linux-gnu");
+    fs.mkdirSync(subDir);
+    fs.writeFileSync(path.join(subDir, "ocx"), "");
+    const cachedSubDir = path.join(cachedDir, "ocx-x86_64-unknown-linux-gnu");
+    fs.mkdirSync(cachedSubDir);
+    fs.writeFileSync(path.join(cachedSubDir, "ocx"), "");
+
+    // tc.find always misses, even after overlay restore.
+    tcMocks.find.mockImplementation(() => "");
+    cacheMocks.isFeatureAvailable.mockImplementation(() => true);
+    // restoreCache reports a hit by key, but the tool-cache marker never lands.
+    cacheMocks.restoreCache.mockImplementation((_paths, key) => Promise.resolve(key as string));
+
+    let dlCount = 0;
+    tcMocks.downloadTool.mockImplementation(() => {
+      dlCount++;
+      return Promise.resolve(dlCount === 1 ? archivePath : checksumPath);
+    });
+    tcMocks.extractTar.mockImplementation(() => Promise.resolve(extractedDir));
+    tcMocks.cacheDir.mockImplementation(() => Promise.resolve(cachedDir));
+
+    try {
+      const result = await downloadOcx("0.2.0", "", undefined, { cache: true });
+      expect(result.cacheHit).toBe(false);
+      expect(cacheMocks.restoreCache).toHaveBeenCalledTimes(1);
+      expect(tcMocks.downloadTool).toHaveBeenCalledTimes(2);
+      const warnings = coreMocks.warning.mock.calls.map((c: unknown[]) => String(c[0]));
+      expect(warnings.some((m: string) => m.includes("tool-cache lookup still missed"))).toBe(true);
+    } finally {
+      if (oldEnv === undefined) delete process.env.RUNNER_TOOL_CACHE;
+      else process.env.RUNNER_TOOL_CACHE = oldEnv;
+      fs.rmSync(tmpDir, { recursive: true });
+      fs.rmSync(extractedDir, { recursive: true });
+      fs.rmSync(cachedDir, { recursive: true });
+      fs.rmSync(runnerToolCache, { recursive: true });
+    }
+  });
+
+  test("falls through to download when overlay restoreCache throws", async () => {
+    const runnerToolCache = makeTempDir("test-runner-tc");
+    const oldEnv = process.env.RUNNER_TOOL_CACHE;
+    process.env.RUNNER_TOOL_CACHE = runnerToolCache;
+
+    const tmpDir = makeTempDir("test-download");
+    const archivePath = path.join(tmpDir, "archive.tar.xz");
+    const checksumPath = path.join(tmpDir, "archive.sha256");
+    const extractedDir = makeTempDir("test-extracted");
+    const cachedDir = makeTempDir("test-cached");
+
+    const archiveContent = Buffer.from("content");
+    fs.writeFileSync(archivePath, archiveContent);
+    const hash = crypto.createHash("sha256").update(archiveContent).digest("hex");
+    fs.writeFileSync(checksumPath, hash);
+
+    const subDir = path.join(extractedDir, "ocx-x86_64-unknown-linux-gnu");
+    fs.mkdirSync(subDir);
+    fs.writeFileSync(path.join(subDir, "ocx"), "");
+    const cachedSubDir = path.join(cachedDir, "ocx-x86_64-unknown-linux-gnu");
+    fs.mkdirSync(cachedSubDir);
+    fs.writeFileSync(path.join(cachedSubDir, "ocx"), "");
+
+    tcMocks.find.mockImplementation(() => "");
+    cacheMocks.isFeatureAvailable.mockImplementation(() => true);
+    cacheMocks.restoreCache.mockImplementation(() => Promise.reject(new Error("network blip")));
+
+    let dlCount = 0;
+    tcMocks.downloadTool.mockImplementation(() => {
+      dlCount++;
+      return Promise.resolve(dlCount === 1 ? archivePath : checksumPath);
+    });
+    tcMocks.extractTar.mockImplementation(() => Promise.resolve(extractedDir));
+    tcMocks.cacheDir.mockImplementation(() => Promise.resolve(cachedDir));
+
+    try {
+      const result = await downloadOcx("0.2.0", "", undefined, { cache: true });
+      expect(result.cacheHit).toBe(false);
+      expect(tcMocks.downloadTool).toHaveBeenCalledTimes(2);
+      const warnings = coreMocks.warning.mock.calls.map((c: unknown[]) => String(c[0]));
+      expect(
+        warnings.some(
+          (m: string) =>
+            m.includes("Failed to restore ocx binary cache") && m.includes("network blip"),
+        ),
+      ).toBe(true);
+    } finally {
+      if (oldEnv === undefined) delete process.env.RUNNER_TOOL_CACHE;
+      else process.env.RUNNER_TOOL_CACHE = oldEnv;
+      fs.rmSync(tmpDir, { recursive: true });
+      fs.rmSync(extractedDir, { recursive: true });
+      fs.rmSync(cachedDir, { recursive: true });
+      fs.rmSync(runnerToolCache, { recursive: true });
+    }
+  });
+
   test("skips cross-run cache when cache feature unavailable", async () => {
     const tmpDir = makeTempDir("test-download");
     const archivePath = path.join(tmpDir, "archive.tar.xz");

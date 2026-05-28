@@ -95,6 +95,28 @@ describe("setup", () => {
     expect(coreMocks.exportVariable).toHaveBeenCalledWith("OCX_HOME", expect.any(String));
   });
 
+  test("auto-detects libc on linux when libc input is empty and a project is loaded", async () => {
+    const projDir = makeTempDir();
+    fs.writeFileSync(path.join(projDir, "ocx.toml"), "[tools]\n");
+    fs.writeFileSync(path.join(projDir, "ocx.lock"), "x");
+    inputState.inputs = {
+      version: "latest",
+      "github-token": "",
+      libc: "",
+      project: "ocx.toml",
+      "working-directory": projDir,
+    };
+    inputState.booleanInputs = { cache: false };
+    const oldPlatform = process.platform;
+    Object.defineProperty(process, "platform", { value: "linux" });
+    try {
+      await run();
+      expect(coreMocks.setOutput).toHaveBeenCalledWith("project-loaded", "true");
+    } finally {
+      Object.defineProperty(process, "platform", { value: oldPlatform });
+    }
+  });
+
   test("project disabled when project input is empty", async () => {
     const projDir = makeTempDir();
     fs.writeFileSync(path.join(projDir, "ocx.toml"), "[tools]\n");
