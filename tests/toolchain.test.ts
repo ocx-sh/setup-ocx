@@ -56,17 +56,17 @@ const execMock = mock(
 
 mock.module("@actions/exec", () => ({ exec: execMock }));
 
-const restoreObjectStoreCacheMock = mock(async () => ({
-  key: "store-key",
-  hit: false,
-  matchedKey: undefined,
-}));
-const buildCacheKeyMock = mock(() => "store-key");
+// Use the real ../src/cache module — mocking source modules pollutes other
+// test files because bun's mock.module is global. We mock @actions/cache
+// directly instead.
+const isFeatureAvailableMock = mock(() => false);
+const restoreCacheMock = mock(() => Promise.resolve(undefined as string | undefined));
+const saveCacheMock = mock(() => Promise.resolve(0));
 
-mock.module("../src/cache", () => ({
-  buildCacheKey: buildCacheKeyMock,
-  restoreObjectStoreCache: restoreObjectStoreCacheMock,
-  saveObjectStoreCache: mock(() => Promise.resolve()),
+mock.module("@actions/cache", () => ({
+  isFeatureAvailable: isFeatureAvailableMock,
+  restoreCache: restoreCacheMock,
+  saveCache: saveCacheMock,
 }));
 
 const { applyShellExports, readToolchainInputs, loadToolchain } = await import(
@@ -212,11 +212,13 @@ describe("loadToolchain", () => {
     exportVariableMock.mockClear();
     addPathMock.mockClear();
     saveStateMock.mockClear();
-    restoreObjectStoreCacheMock.mockClear();
+    isFeatureAvailableMock.mockClear();
+    restoreCacheMock.mockClear();
+    saveCacheMock.mockClear();
     envOutput = 'export PATH="/opt/bun/bin:${PATH}"\nexport BUN_VERSION="1.3"\n';
-    restoreObjectStoreCacheMock.mockImplementation(async () => ({
-      key: "store-key", hit: false,
-    }));
+    // Default: cache feature unavailable — restoreObjectStoreCache returns
+    // hit=false without exercising @actions/cache.
+    isFeatureAvailableMock.mockImplementation(() => false);
   });
 
   test("exports OCX_HOME and runs pull + env", async () => {
@@ -306,7 +308,11 @@ describe("loadToolchain", () => {
           cacheSuffix: "",
         },
       });
-      expect(saveStateMock).toHaveBeenCalledWith("cache-key", "store-key");
+      // Real buildCacheKey produces deterministic shape including os/arch.
+      const expectedKeyPrefix = `setup-ocx-store-${process.platform}-${process.arch}-gnu-ocx0.3.1-`;
+      const cacheKeyCall = saveStateMock.mock.calls.find((c: unknown[]) => c[0] === "cache-key");
+      expect(cacheKeyCall).toBeDefined();
+      expect(cacheKeyCall![1] as string).toContain(expectedKeyPrefix);
       expect(saveStateMock).toHaveBeenCalledWith("ocx-home", home);
       expect(saveStateMock).toHaveBeenCalledWith("cache-hit", "false");
     } finally {
@@ -335,7 +341,7 @@ describe("loadToolchain", () => {
           cacheSuffix: "",
         },
       });
-      expect(restoreObjectStoreCacheMock).not.toHaveBeenCalled();
+      expect(restoreCacheMock).not.toHaveBeenCalled();
       expect(saveStateMock).not.toHaveBeenCalled();
     } finally {
       fs.rmSync(dir, { recursive: true });
