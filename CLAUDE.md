@@ -8,32 +8,37 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-All tasks run through [Task](https://taskfile.dev) and execute inside an OCX environment (`ocx exec nodejs:24 bun:1.3`):
+Tool versions live in `ocx.toml`. Locally, `direnv allow` puts `bun` + `node` on
+`PATH` via `.envrc`. In CI, `ocx-sh/setup-ocx` activates the same toolchain. Tasks
+invoke `bun` / `node` directly — no `ocx exec` / `ocx run` wrapper.
 
 ```bash
-task build          # Bundle with esbuild → dist/setup/index.js
+task build          # Bundle with esbuild → dist/setup + dist/save-cache
 task test           # Run unit tests (bun test)
 task test:watch     # Tests in watch mode
 task check          # test + build + verify dist is fresh
 task dist:check     # Verify committed dist matches a clean build
 task install        # bun install
-task ocx:update     # Update .ocx index
+task update:lock    # Re-resolve ocx.lock from ocx.toml
 ```
 
 Use `bun` for package management (not npm).
 
 ## Architecture
 
-Four source modules in `src/`, bundled into a single `dist/setup/index.js` by `esbuild`:
+Source modules in `src/` are bundled into two artifacts by `esbuild`: `dist/setup/index.js` (main entry) and `dist/save-cache/index.js` (post entry).
 
 | Module | Responsibility |
 |---|---|
-| `setup.ts` | Entry point — reads action inputs, orchestrates resolve → download → cache → output |
-| `version.ts` | Resolves `"latest"` to a concrete version via the GitHub Releases API |
+| `setup.ts` | Main entry — reads inputs, orchestrates resolve → download → cache → toolchain activation |
+| `save-cache.ts` | Post entry — saves binary + object-store caches deferred by the main step |
+| `version.ts` | Resolves `"latest"` to a concrete version via the GitHub Releases API (with retry) |
 | `constants.ts` | Maps Node.js `platform`/`arch` to Rust target triples; detects musl vs gnu libc |
-| `download.ts` | Downloads archive, verifies SHA256 checksum, extracts, caches, locates binary |
+| `download.ts` | Downloads archive, verifies SHA256, extracts, caches binary (overlays `@actions/cache` over `RUNNER_TOOL_CACHE`) |
+| `cache.ts` | `$OCX_HOME` object store cache (selective dirs, lockfile-hash key) |
+| `toolchain.ts` | Discovers `ocx.toml`, runs `ocx pull`, parses `ocx env`, exports PATH |
 
-The `dist/` directory **is committed** — GitHub Actions require it. After any source change, run `task build` and commit the updated bundle. CI (`task dist:check`) will fail if the bundle is stale.
+The `dist/` directory **is committed** — GitHub Actions require it. After any source change, run `task build` and commit both bundles. CI (`task dist:check`) will fail if either bundle is stale.
 
 ## Testing
 

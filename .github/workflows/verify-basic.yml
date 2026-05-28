@@ -16,16 +16,47 @@ jobs:
       - name: Setup OCX
         id: setup
         uses: ./
-      - uses: arduino/setup-task@b91d5d2c96a56797b48ac1e0e89220bf64044611 # v2
+      - name: Verify toolchain activation
+        run: |
+          bun --version
+          node --version
+          task --version
+          git-cliff --version
+          ocx --version
       - run: task install
       - run: task check
       - name: Verify outputs
         env:
           VERSION: ${{ steps.setup.outputs.version }}
           OCX_PATH: ${{ steps.setup.outputs.ocx-path }}
+          TC_LOADED: ${{ steps.setup.outputs.toolchain-loaded }}
         run: |
           test -n "$VERSION"
           test -n "$OCX_PATH"
+          test "$TC_LOADED" = "true"
+
+  toolchain-disabled:
+    name: Toolchain disabled (binary-only)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Setup OCX (binary only)
+        id: setup
+        uses: ./
+        with:
+          toolchain: ''
+      - name: Verify ocx works but toolchain is not activated
+        env:
+          TC_LOADED: ${{ steps.setup.outputs.toolchain-loaded }}
+        run: |
+          ocx --version
+          test "$TC_LOADED" = "false"
+          if command -v bun >/dev/null 2>&1; then
+            echo "bun unexpectedly on PATH"
+            exit 1
+          fi
 
   integration-musl:
     name: Integration (musl)
@@ -39,11 +70,14 @@ jobs:
         uses: ./
         with:
           libc: musl
-      - run: ocx info
+      - run: bun --version
+      - run: node --version
       - name: Verify outputs
         env:
           VERSION: ${{ steps.setup.outputs.version }}
           OCX_PATH: ${{ steps.setup.outputs.ocx-path }}
+          TC_LOADED: ${{ steps.setup.outputs.toolchain-loaded }}
         run: |
           test -n "$VERSION"
           test -n "$OCX_PATH"
+          test "$TC_LOADED" = "true"

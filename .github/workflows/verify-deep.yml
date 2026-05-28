@@ -2,6 +2,8 @@ name: Verify Deep
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
 
 jobs:
   integration:
@@ -26,17 +28,28 @@ jobs:
         with:
           version: latest
           libc: ${{ matrix.libc || '' }}
-      - name: Verify installation
-        run: ocx info
+      - name: Verify binary
+        shell: bash
+        run: ocx --version
+      - name: Verify toolchain activation
+        shell: bash
+        run: |
+          bun --version
+          node --version
       - name: Verify outputs
         shell: bash
         env:
           VERSION: ${{ steps.setup.outputs.version }}
           OCX_PATH: ${{ steps.setup.outputs.ocx-path }}
           CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}
+          TC_LOADED: ${{ steps.setup.outputs.toolchain-loaded }}
+          TC_CACHE_HIT: ${{ steps.setup.outputs.toolchain-cache-hit }}
         run: |
           echo "version=$VERSION"
           echo "ocx-path=$OCX_PATH"
           echo "cache-hit=$CACHE_HIT"
+          echo "toolchain-loaded=$TC_LOADED"
+          echo "toolchain-cache-hit=$TC_CACHE_HIT"
           test -n "$VERSION"
           test -n "$OCX_PATH"
+          test "$TC_LOADED" = "true"

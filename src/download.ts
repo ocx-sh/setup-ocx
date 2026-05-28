@@ -1,3 +1,4 @@
+import * as cache from "@actions/cache";
 import * as core from "@actions/core";
 import * as tc from "@actions/tool-cache";
 import * as crypto from "crypto";
@@ -11,18 +12,42 @@ export interface DownloadResult {
   cacheHit: boolean;
 }
 
+export interface DownloadOptions {
+  cache?: boolean;
+}
+
+/**
+ * Build the cache key used by the @actions/cache overlay over RUNNER_TOOL_CACHE.
+ * Encodes the full Rust target triple so libc + platform + arch all participate.
+ */
+export function binaryCacheKey(target: string, version: string): string {
+  return `setup-ocx-bin-${target}-${version}`;
+}
+
+/**
+ * Path inside RUNNER_TOOL_CACHE where @actions/tool-cache stores the
+ * extracted ocx archive. We snapshot this directory for cross-run reuse.
+ */
+function toolCachePath(version: string, arch: string): string | null {
+  const root = process.env.RUNNER_TOOL_CACHE;
+  if (!root) return null;
+  return path.join(root, "ocx", version, arch);
+}
+
 export async function downloadOcx(
   version: string,
   token: string,
   libc?: Libc,
+  options?: DownloadOptions,
 ): Promise<DownloadResult> {
   const { target, isWindows } = getTarget({ libc });
   const archiveName = getArchiveName(target, isWindows);
+  const cacheEnabled = options?.cache ?? true;
 
   core.info(`Target: ${target}`);
   core.debug(`Archive: ${archiveName}`);
 
-  // Check tool cache first
+  // 1. Fast path: intra-job tool-cache.
   const cached = tc.find("ocx", version, process.arch);
   if (cached) {
     core.info(`Found cached OCX ${version} at ${cached}`);
@@ -30,19 +55,56 @@ export async function downloadOcx(
     return { binDir, version, cacheHit: true };
   }
 
-  // Download archive
+  // 2. Cross-run overlay: try @actions/cache against the tool-cache dir.
+  const cacheKey = binaryCacheKey(target, version);
+  const cachePath = toolCachePath(version, process.arch);
+  const overlayAvailable =
+    cacheEnabled && cachePath !== null && cache.isFeatureAvailable();
+
+  if (overlayAvailable && cachePath) {
+    try {
+      core.info(`Restoring ocx binary cache (key=${cacheKey})...`);
+      fs.mkdirSync(cachePath, { recursive: true });
+      const restored = await cache.restoreCache([cachePath], cacheKey);
+      if (restored) {
+        const reFind = tc.find("ocx", version, process.arch);
+        if (reFind) {
+          core.info(`Restored ocx binary from cache (${restored})`);
+          const binDir = findBinDir(reFind);
+          return { binDir, version, cacheHit: true };
+        }
+        core.warning(
+          `Cache key ${cacheKey} restored but tool-cache lookup still missed; falling through to download.`,
+        );
+      } else {
+        core.info(`No ocx binary cache entry for key ${cacheKey}`);
+      }
+    } catch (err) {
+      core.warning(
+        `Failed to restore ocx binary cache: ${err instanceof Error ? err.message : err}`,
+      );
+    }
+  }
+
+  // 3. Download + verify + extract + cache locally.
   const archiveUrl = getDownloadUrl(version, archiveName);
   core.info(`Downloading OCX ${version} from ${archiveUrl}`);
 
-  const archivePath = await tc.downloadTool(archiveUrl, undefined, token ? `Bearer ${token}` : undefined);
+  const archivePath = await tc.downloadTool(
+    archiveUrl,
+    undefined,
+    token ? `Bearer ${token}` : undefined,
+  );
 
-  // Download and verify checksum
   const checksumUrl = getDownloadUrl(version, `${archiveName}.sha256`);
   core.info(`Verifying checksum from ${checksumUrl}`);
 
-  const checksumPath = await tc.downloadTool(checksumUrl, undefined, token ? `Bearer ${token}` : undefined);
+  const checksumPath = await tc.downloadTool(
+    checksumUrl,
+    undefined,
+    token ? `Bearer ${token}` : undefined,
+  );
   const checksumContent = fs.readFileSync(checksumPath, "utf8").trim();
-  // Format: "<hash>  <filename>" or just "<hash>"
   const expectedHash = checksumContent.split(/\s+/)[0];
 
   const fileBuffer = fs.readFileSync(archivePath);
@@ -51,11 +113,12 @@ export async function downloadOcx(
   core.debug(`SHA256 expected=${expectedHash} actual=${actualHash}`);
 
   if (actualHash !== expectedHash) {
-    throw new Error(`SHA256 mismatch for ${archiveName}:\n  expected: ${expectedHash}\n  actual:   ${actualHash}`);
+    throw new Error(
+      `SHA256 mismatch for ${archiveName}:\n  expected: ${expectedHash}\n  actual:   ${actualHash}`,
+    );
   }
   core.info("Checksum verified");
 
-  // Extract archive
   let extractedDir: string;
   if (isWindows) {
     extractedDir = await tc.extractZip(archivePath);
@@ -64,11 +127,31 @@ export async function downloadOcx(
     extractedDir = await tc.extractTar(archivePath, undefined, flags);
   }
 
-  // Cache the extracted directory
   const cachedDir = await tc.cacheDir(extractedDir, "ocx", version, process.arch);
+
+  // 4. Defer the cross-run save to the post step.
+  if (overlayAvailable && cachePath) {
+    core.saveState("bin-cache-key", cacheKey);
+    core.saveState("bin-cache-path", cachePath);
+  }
 
   const binDir = findBinDir(cachedDir);
   return { binDir, version, cacheHit: false };
+}
+
+/**
+ * Save the ocx binary cache from the post step. Wraps @actions/cache.saveCache
+ * with warning-only error handling so a save failure never fails the user's job.
+ */
+export async function saveBinaryCache(cachePath: string, key: string): Promise<void> {
+  try {
+    core.info(`Saving ocx binary cache (key=${key})...`);
+    await cache.saveCache([cachePath], key);
+  } catch (err) {
+    core.warning(
+      `Failed to save ocx binary cache: ${err instanceof Error ? err.message : err}`,
+    );
+  }
 }
 
 /**
@@ -78,8 +161,6 @@ export async function downloadOcx(
 export function findBinDir(dir: string): string {
   const entries = fs.readdirSync(dir);
 
-  // cargo-dist puts the binary inside a subdirectory named after the archive
-  // e.g., ocx-x86_64-unknown-linux-gnu/ocx
   for (const entry of entries) {
     const subPath = path.join(dir, entry);
     if (fs.statSync(subPath).isDirectory()) {

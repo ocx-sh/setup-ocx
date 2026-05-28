@@ -7,9 +7,26 @@ import * as path from "path";
 // --- Mocks for downloadOcx tests ---
 
 const infoMock = mock(() => {});
+const warningMock = mock(() => {});
+const saveStateMock = mock(() => {});
 mock.module("@actions/core", () => ({
   info: infoMock,
   debug: mock(() => {}),
+  warning: warningMock,
+  saveState: saveStateMock,
+  getInput: mock(() => ""),
+  getBooleanInput: mock(() => false),
+  setOutput: mock(() => {}),
+  setFailed: mock(() => {}),
+  addPath: mock(() => {}),
+  exportVariable: mock(() => {}),
+  isDebug: mock(() => false),
+  group: mock(async (_name: string, fn: () => Promise<unknown>) => fn()),
+  summary: {
+    addHeading: mock(function (this: unknown) { return this; }),
+    addTable: mock(function (this: unknown) { return this; }),
+    write: mock(() => Promise.resolve({ filePath: "" })),
+  },
 }));
 
 const findMock = mock(() => "");
@@ -26,6 +43,16 @@ mock.module("@actions/tool-cache", () => ({
   cacheDir: cacheDirMock,
 }));
 
+const isFeatureAvailableMock = mock(() => false);
+const restoreCacheMock = mock(() => Promise.resolve(undefined as string | undefined));
+const saveCacheMock = mock(() => Promise.resolve(0));
+
+mock.module("@actions/cache", () => ({
+  isFeatureAvailable: isFeatureAvailableMock,
+  restoreCache: restoreCacheMock,
+  saveCache: saveCacheMock,
+}));
+
 const getTargetMock = mock(() => ({ target: "x86_64-unknown-linux-gnu", isWindows: false }));
 
 mock.module("../src/constants", () => ({
@@ -35,7 +62,7 @@ mock.module("../src/constants", () => ({
     `https://github.com/ocx-sh/ocx/releases/download/v${version}/${filename}`,
 }));
 
-const { findBinDir, downloadOcx } = await import("../src/download");
+const { findBinDir, downloadOcx, binaryCacheKey, saveBinaryCache } = await import("../src/download");
 
 // --- findBinDir tests (use real fs) ---
 
@@ -103,7 +130,15 @@ describe("findBinDir", () => {
   });
 });
 
-// --- downloadOcx tests (use mocked tool-cache) ---
+describe("binaryCacheKey", () => {
+  test("encodes target and version", () => {
+    expect(binaryCacheKey("x86_64-unknown-linux-gnu", "0.2.0")).toBe(
+      "setup-ocx-bin-x86_64-unknown-linux-gnu-0.2.0",
+    );
+  });
+});
+
+// --- downloadOcx tests (use mocked tool-cache + cache) ---
 
 describe("downloadOcx", () => {
   function makeTempDir(): string {
@@ -114,12 +149,19 @@ describe("downloadOcx", () => {
 
   beforeEach(() => {
     infoMock.mockClear();
+    warningMock.mockClear();
+    saveStateMock.mockClear();
     findMock.mockClear();
     downloadToolMock.mockClear();
     extractTarMock.mockClear();
     extractZipMock.mockClear();
     cacheDirMock.mockClear();
+    isFeatureAvailableMock.mockClear();
+    restoreCacheMock.mockClear();
+    saveCacheMock.mockClear();
     findMock.mockImplementation(() => "");
+    isFeatureAvailableMock.mockImplementation(() => false);
+    restoreCacheMock.mockImplementation(() => Promise.resolve(undefined));
     getTargetMock.mockImplementation(() => ({ target: "x86_64-unknown-linux-gnu", isWindows: false }));
   });
 
@@ -137,8 +179,134 @@ describe("downloadOcx", () => {
       expect(result.binDir).toBe(subDir);
       expect(result.version).toBe("0.2.0");
       expect(downloadToolMock).not.toHaveBeenCalled();
+      expect(restoreCacheMock).not.toHaveBeenCalled();
     } finally {
       fs.rmSync(cacheDir, { recursive: true });
+    }
+  });
+
+  test("@actions/cache overlay restores the tool-cache dir on cross-run hit", async () => {
+    const runnerToolCache = makeTempDir();
+    const oldEnv = process.env.RUNNER_TOOL_CACHE;
+    process.env.RUNNER_TOOL_CACHE = runnerToolCache;
+    const cachedDir = path.join(runnerToolCache, "ocx", "0.2.0", process.arch);
+    const subDir = path.join(cachedDir, "ocx-x86_64-unknown-linux-gnu");
+
+    let findCalls = 0;
+    findMock.mockImplementation(() => {
+      findCalls++;
+      // Miss on first call (pre-restore), hit on second (post-restore).
+      if (findCalls === 1) return "";
+      return cachedDir;
+    });
+
+    isFeatureAvailableMock.mockImplementation(() => true);
+    restoreCacheMock.mockImplementation(async () => {
+      fs.mkdirSync(subDir, { recursive: true });
+      fs.writeFileSync(path.join(subDir, "ocx"), "");
+      return "setup-ocx-bin-x86_64-unknown-linux-gnu-0.2.0";
+    });
+
+    try {
+      const result = await downloadOcx("0.2.0", "", undefined, { cache: true });
+      expect(result.cacheHit).toBe(true);
+      expect(result.binDir).toBe(subDir);
+      expect(restoreCacheMock).toHaveBeenCalledTimes(1);
+      expect(downloadToolMock).not.toHaveBeenCalled();
+      expect(saveStateMock).not.toHaveBeenCalled();
+    } finally {
+      if (oldEnv === undefined) delete process.env.RUNNER_TOOL_CACHE;
+      else process.env.RUNNER_TOOL_CACHE = oldEnv;
+      fs.rmSync(runnerToolCache, { recursive: true });
+    }
+  });
+
+  test("saves state for post step when cross-run cache misses and download runs", async () => {
+    const runnerToolCache = makeTempDir();
+    const oldEnv = process.env.RUNNER_TOOL_CACHE;
+    process.env.RUNNER_TOOL_CACHE = runnerToolCache;
+
+    const tmpDir = makeTempDir();
+    const archivePath = path.join(tmpDir, "archive.tar.xz");
+    const checksumPath = path.join(tmpDir, "archive.sha256");
+    const extractedDir = makeTempDir();
+    const cachedDir = makeTempDir();
+
+    const archiveContent = Buffer.from("content");
+    fs.writeFileSync(archivePath, archiveContent);
+    const hash = crypto.createHash("sha256").update(archiveContent).digest("hex");
+    fs.writeFileSync(checksumPath, hash);
+
+    const subDir = path.join(extractedDir, "ocx-x86_64-unknown-linux-gnu");
+    fs.mkdirSync(subDir);
+    fs.writeFileSync(path.join(subDir, "ocx"), "");
+    const cachedSubDir = path.join(cachedDir, "ocx-x86_64-unknown-linux-gnu");
+    fs.mkdirSync(cachedSubDir);
+    fs.writeFileSync(path.join(cachedSubDir, "ocx"), "");
+
+    let downloadCallCount = 0;
+    downloadToolMock.mockImplementation(() => {
+      downloadCallCount++;
+      return Promise.resolve(downloadCallCount === 1 ? archivePath : checksumPath);
+    });
+    extractTarMock.mockImplementation(() => Promise.resolve(extractedDir));
+    cacheDirMock.mockImplementation(() => Promise.resolve(cachedDir));
+    isFeatureAvailableMock.mockImplementation(() => true);
+    restoreCacheMock.mockImplementation(() => Promise.resolve(undefined));
+
+    try {
+      const result = await downloadOcx("0.2.0", "", undefined, { cache: true });
+      expect(result.cacheHit).toBe(false);
+      expect(saveStateMock).toHaveBeenCalledWith(
+        "bin-cache-key",
+        "setup-ocx-bin-x86_64-unknown-linux-gnu-0.2.0",
+      );
+      expect(saveStateMock).toHaveBeenCalledWith(
+        "bin-cache-path",
+        path.join(runnerToolCache, "ocx", "0.2.0", process.arch),
+      );
+    } finally {
+      if (oldEnv === undefined) delete process.env.RUNNER_TOOL_CACHE;
+      else process.env.RUNNER_TOOL_CACHE = oldEnv;
+      fs.rmSync(tmpDir, { recursive: true });
+      fs.rmSync(extractedDir, { recursive: true });
+      fs.rmSync(cachedDir, { recursive: true });
+      fs.rmSync(runnerToolCache, { recursive: true });
+    }
+  });
+
+  test("skips cross-run cache when cache feature unavailable", async () => {
+    const tmpDir = makeTempDir();
+    const archivePath = path.join(tmpDir, "archive.tar.xz");
+    const checksumPath = path.join(tmpDir, "archive.sha256");
+    const extractedDir = makeTempDir();
+    const cachedDir = makeTempDir();
+
+    const archiveContent = Buffer.from("content");
+    fs.writeFileSync(archivePath, archiveContent);
+    const hash = crypto.createHash("sha256").update(archiveContent).digest("hex");
+    fs.writeFileSync(checksumPath, hash);
+
+    fs.writeFileSync(path.join(extractedDir, "ocx"), "");
+    fs.writeFileSync(path.join(cachedDir, "ocx"), "");
+
+    let downloadCallCount = 0;
+    downloadToolMock.mockImplementation(() => {
+      downloadCallCount++;
+      return Promise.resolve(downloadCallCount === 1 ? archivePath : checksumPath);
+    });
+    extractTarMock.mockImplementation(() => Promise.resolve(extractedDir));
+    cacheDirMock.mockImplementation(() => Promise.resolve(cachedDir));
+    isFeatureAvailableMock.mockImplementation(() => false);
+
+    try {
+      await downloadOcx("0.2.0", "", undefined, { cache: true });
+      expect(restoreCacheMock).not.toHaveBeenCalled();
+      expect(saveStateMock).not.toHaveBeenCalled();
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true });
+      fs.rmSync(extractedDir, { recursive: true });
+      fs.rmSync(cachedDir, { recursive: true });
     }
   });
 
@@ -149,18 +317,15 @@ describe("downloadOcx", () => {
     const extractedDir = makeTempDir();
     const cachedDir = makeTempDir();
 
-    // Create a fake archive file with known content
     const archiveContent = Buffer.from("fake-archive-content");
     fs.writeFileSync(archivePath, archiveContent);
     const expectedHash = crypto.createHash("sha256").update(archiveContent).digest("hex");
     fs.writeFileSync(checksumPath, `${expectedHash}  ocx-x86_64-unknown-linux-gnu.tar.xz\n`);
 
-    // Create extracted dir with ocx binary
     const subDir = path.join(extractedDir, "ocx-x86_64-unknown-linux-gnu");
     fs.mkdirSync(subDir);
     fs.writeFileSync(path.join(subDir, "ocx"), "");
 
-    // Same structure in cached dir
     const cachedSubDir = path.join(cachedDir, "ocx-x86_64-unknown-linux-gnu");
     fs.mkdirSync(cachedSubDir);
     fs.writeFileSync(path.join(cachedSubDir, "ocx"), "");
@@ -279,5 +444,24 @@ describe("downloadOcx", () => {
       fs.rmSync(extractedDir, { recursive: true });
       fs.rmSync(cachedDir, { recursive: true });
     }
+  });
+});
+
+describe("saveBinaryCache", () => {
+  beforeEach(() => {
+    saveCacheMock.mockClear();
+    warningMock.mockClear();
+  });
+
+  test("delegates to @actions/cache.saveCache", async () => {
+    saveCacheMock.mockImplementation(() => Promise.resolve(42));
+    await saveBinaryCache("/some/path", "my-key");
+    expect(saveCacheMock).toHaveBeenCalledWith(["/some/path"], "my-key");
+  });
+
+  test("swallows errors into warnings", async () => {
+    saveCacheMock.mockImplementation(() => Promise.reject(new Error("boom")));
+    await saveBinaryCache("/some/path", "my-key");
+    expect(warningMock).toHaveBeenCalled();
   });
 });

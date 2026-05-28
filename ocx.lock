@@ -1,0 +1,26 @@
+[metadata]
+lock_version = 1
+declaration_hash_version = 1
+declaration_hash = "sha256:37686f1020192de1a8911e655f150665f2006a07b5d86cfd307b2abc99edbf71"
+generated_by = "ocx 0.3.1"
+generated_at = "2026-05-28T14:50:50Z"
+
+[[tool]]
+name = "bun"
+group = "default"
+pinned = "ocx.sh/bun@sha256:83acea5455ed13df3aa1e2e4b7574a71fa5164c0c029f03b03209e2a1312af02"
+
+[[tool]]
+name = "git-cliff"
+group = "default"
+pinned = "ocx.sh/git-cliff@sha256:4bf5212fbf07f6c8f0cc70311eb079b4c4be0cda32d531eafffcd8dc3edc0ea7"
+
+[[tool]]
+name = "go-task"
+group = "default"
+pinned = "ocx.sh/go-task@sha256:fcfad89eae0672b309b5bcc7bb25e592cab244296dd9885233631b95da1ee41c"
+
+[[tool]]
+name = "nodejs"
+group = "default"
+pinned = "ocx.sh/nodejs@sha256:3bf3222f1b0fc2665f5d81c12480ef8ec72807b476b22b02176ebbc0302ca613"

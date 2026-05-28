@@ -19,14 +19,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup OCX
+        uses: ./
+
       - name: Generate release notes
         id: changelog
-        uses: orhun/git-cliff-action@c93ef52f3d0ddcdcc9bd5447d98d458a11cd4f72 # v4
-        with:
-          args: --latest --strip header
         env:
-          GITHUB_REPO: ${{ github.repository }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OUTPUT: ${{ runner.temp }}/release-notes.md
+        run: |
+          git-cliff --latest --strip header --output "$OUTPUT"
+          {
+            echo 'content<<EOF'
+            cat "$OUTPUT"
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create release
         uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2
