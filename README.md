@@ -63,6 +63,10 @@ steps:
   - run: bun test
 ```
 
+> **Note:** Project activation uses `ocx env --ci=github`, introduced in ocx
+> **0.3.5**, to persist the toolchain into `$GITHUB_PATH` / `$GITHUB_ENV`. If you
+> pin `version` to an older release, set `project: ""` to use binary-only mode.
+
 **Binary-only mode (no project):**
 
 ```yaml

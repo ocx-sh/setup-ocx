@@ -6,6 +6,30 @@ import { downloadOcx } from "./download.js";
 import { loadProject, readProjectInputs } from "./project.js";
 import { resolveVersion } from "./version.js";
 
+/** Minimum ocx version that supports `ocx env --ci=github` (project activation). */
+const MIN_PROJECT_OCX_VERSION = "0.3.5";
+
+/**
+ * Compare two dotted numeric versions (optional leading `v`).
+ * Returns <0 if a<b, 0 if equal, >0 if a>b. Non-numeric / missing segments
+ * are treated as 0, so pre-release suffixes are ignored for the floor check.
+ */
+export function compareVersions(a: string, b: string): number {
+  const parse = (v: string): number[] =>
+    v
+      .replace(/^v/, "")
+      .split(".")
+      .map((s) => Number.parseInt(s, 10) || 0);
+  const pa = parse(a);
+  const pb = parse(b);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
 export async function run(): Promise<void> {
   try {
     const versionInput = core.getInput("version");
@@ -52,6 +76,12 @@ export async function run(): Promise<void> {
     let projectCacheHit = false;
 
     if (projectInputs) {
+      if (compareVersions(installedVersion, MIN_PROJECT_OCX_VERSION) < 0) {
+        throw new Error(
+          `Project activation requires ocx >= ${MIN_PROJECT_OCX_VERSION} (env --ci). ` +
+            `Resolved ${installedVersion} is too old — upgrade the version input or set project: ''.`,
+        );
+      }
       const ocxBin = path.join(binDir, process.platform === "win32" ? "ocx.exe" : "ocx");
       const result = await loadProject({
         ocxBin,

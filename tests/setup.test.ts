@@ -11,7 +11,7 @@ import {
   resetMocks,
   tcMocks,
 } from "./setup-mocks.js";
-import { run } from "../src/setup.js";
+import { compareVersions, run } from "../src/setup.js";
 
 function makeTempDir(): string {
   const dir = path.join(
@@ -82,7 +82,7 @@ describe("setup", () => {
     fs.writeFileSync(path.join(projDir, "ocx.toml"), "[tools]\n");
     fs.writeFileSync(path.join(projDir, "ocx.lock"), "x");
     inputState.inputs = {
-      version: "latest",
+      version: "0.3.5",
       "github-token": "",
       libc: "gnu",
       project: "ocx.toml",
@@ -100,7 +100,7 @@ describe("setup", () => {
     fs.writeFileSync(path.join(projDir, "ocx.toml"), "[tools]\n");
     fs.writeFileSync(path.join(projDir, "ocx.lock"), "x");
     inputState.inputs = {
-      version: "latest",
+      version: "0.3.5",
       "github-token": "",
       libc: "",
       project: "ocx.toml",
@@ -115,6 +115,26 @@ describe("setup", () => {
     } finally {
       Object.defineProperty(process, "platform", { value: oldPlatform });
     }
+  });
+
+  test("fails project activation when resolved ocx is older than 0.3.5", async () => {
+    const projDir = makeTempDir();
+    fs.writeFileSync(path.join(projDir, "ocx.toml"), "[tools]\n");
+    fs.writeFileSync(path.join(projDir, "ocx.lock"), "x");
+    inputState.inputs = {
+      version: "0.3.4",
+      "github-token": "",
+      libc: "gnu",
+      project: "ocx.toml",
+      "working-directory": projDir,
+    };
+    inputState.booleanInputs = { cache: false };
+    await run();
+    expect(coreMocks.setFailed).toHaveBeenCalledWith(
+      expect.stringMatching(/requires ocx >= 0\.3\.5/),
+    );
+    expect(execMocks.exec).not.toHaveBeenCalled();
+    expect(coreMocks.setOutput).not.toHaveBeenCalledWith("project-loaded", "true");
   });
 
   test("project disabled when project input is empty", async () => {
@@ -188,5 +208,23 @@ describe("setup", () => {
     await run();
     // overlay restore is only attempted on tool-cache miss; cache hit short-circuits.
     expect(coreMocks.setFailed).not.toHaveBeenCalled();
+  });
+});
+
+describe("compareVersions", () => {
+  test("orders by numeric segments", () => {
+    expect(compareVersions("0.3.4", "0.3.5")).toBeLessThan(0);
+    expect(compareVersions("0.4.0", "0.3.5")).toBeGreaterThan(0);
+    expect(compareVersions("1.0.0", "0.9.9")).toBeGreaterThan(0);
+  });
+
+  test("treats equal versions as 0 and ignores leading v", () => {
+    expect(compareVersions("0.3.5", "0.3.5")).toBe(0);
+    expect(compareVersions("v0.3.5", "0.3.5")).toBe(0);
+  });
+
+  test("treats missing trailing segments as 0", () => {
+    expect(compareVersions("0.3", "0.3.0")).toBe(0);
+    expect(compareVersions("0.3.5", "0.3")).toBeGreaterThan(0);
   });
 });

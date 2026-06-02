@@ -105283,6 +105283,7 @@ var require_semver3 = __commonJS({
 // src/setup.ts
 var setup_exports = {};
 __export(setup_exports, {
+  compareVersions: () => compareVersions,
   run: () => run
 });
 module.exports = __toCommonJS(setup_exports);
@@ -108074,17 +108075,9 @@ async function loadProject(args) {
     await exec2.exec(ocxBin, pullArgs, { cwd: inputs.workingDirectory });
   });
   await group("ocx env", async () => {
-    const shellArg = process.platform === "win32" ? "powershell" : "bash";
-    let envOutput = "";
-    await exec2.exec(ocxBin, ["--project", inputs.projectFile, "env", `--shell=${shellArg}`], {
-      cwd: inputs.workingDirectory,
-      listeners: {
-        stdout: (data) => {
-          envOutput += data.toString();
-        }
-      }
+    await exec2.exec(ocxBin, ["--project", inputs.projectFile, "env", "--ci=github"], {
+      cwd: inputs.workingDirectory
     });
-    applyShellExports(envOutput, shellArg);
   });
   if (inputs.cacheEnabled) {
     saveState("cache-key", cacheKey);
@@ -108092,50 +108085,6 @@ async function loadProject(args) {
     saveState("cache-hit", cacheHit ? "true" : "false");
   }
   return { cacheKey, cacheHit };
-}
-function applyShellExports(text, shell) {
-  const lines = text.split(/\r?\n/);
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    if (shell === "bash") {
-      const m = /^export\s+([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(trimmed);
-      if (!m?.[1] || m[2] === void 0) continue;
-      const name = m[1];
-      const value = unquoteBash(m[2]);
-      applyAssignment(name, value, /[:]\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$/);
-    } else {
-      const m = /^\$env:([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(trimmed);
-      if (!m?.[1] || m[2] === void 0) continue;
-      const name = m[1];
-      const value = unquotePs(m[2]);
-      applyAssignment(name, value, /;\$env:[A-Za-z_][A-Za-z0-9_]*$/);
-    }
-  }
-}
-function applyAssignment(name, value, prependTail) {
-  const tailMatch = prependTail.exec(value);
-  if (name === "PATH" && tailMatch) {
-    const prefix2 = value.slice(0, tailMatch.index);
-    const sep2 = process.platform === "win32" ? ";" : ":";
-    for (const entry of prefix2.split(sep2)) {
-      if (entry) addPath(entry);
-    }
-  } else {
-    exportVariable(name, value);
-  }
-}
-function unquoteBash(raw) {
-  let s = raw.trim();
-  if (s.startsWith('"') && s.endsWith('"')) s = s.slice(1, -1);
-  else if (s.startsWith("'") && s.endsWith("'")) s = s.slice(1, -1);
-  return s.replace(/\\(.)/g, "$1");
-}
-function unquotePs(raw) {
-  let s = raw.trim();
-  if (s.startsWith('"') && s.endsWith('"')) s = s.slice(1, -1);
-  else if (s.startsWith("'") && s.endsWith("'")) s = s.slice(1, -1);
-  return s;
 }
 
 // src/http-retry.ts
@@ -108244,6 +108193,18 @@ async function resolveVersion(version2, token) {
 }
 
 // src/setup.ts
+var MIN_PROJECT_OCX_VERSION = "0.3.5";
+function compareVersions(a, b) {
+  const parse2 = (v) => v.replace(/^v/, "").split(".").map((s) => Number.parseInt(s, 10) || 0);
+  const pa = parse2(a);
+  const pb = parse2(b);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
 async function run() {
   try {
     const versionInput = getInput("version");
@@ -108278,6 +108239,11 @@ async function run() {
     let projectLoaded = false;
     let projectCacheHit = false;
     if (projectInputs) {
+      if (compareVersions(installedVersion, MIN_PROJECT_OCX_VERSION) < 0) {
+        throw new Error(
+          `Project activation requires ocx >= ${MIN_PROJECT_OCX_VERSION} (env --ci). Resolved ${installedVersion} is too old \u2014 upgrade the version input or set project: ''.`
+        );
+      }
       const ocxBin = path9.join(binDir, process.platform === "win32" ? "ocx.exe" : "ocx");
       const result = await loadProject({
         ocxBin,
@@ -108318,6 +108284,7 @@ async function run() {
 void run();
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  compareVersions,
   run
 });
 /*! Bundled license information:

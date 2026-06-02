@@ -88,7 +88,8 @@ export function readProjectInputs(): ProjectInputs | null {
  *   1. export OCX_HOME (overrides ~/.ocx so cache + future steps line up)
  *   2. optionally restore object store cache
  *   3. `ocx --project <file> pull [-g ...]` — populate the store
- *   4. `ocx --project <file> env --shell=bash|powershell` — apply env
+ *   4. `ocx --project <file> env --ci=github` — append toolchain env to
+ *      $GITHUB_PATH / $GITHUB_ENV (ocx owns the format; requires ocx >= 0.3.5)
  *   5. saveState for the post step
  */
 export async function loadProject(args: LoadProjectArgs): Promise<LoadProjectResult> {
@@ -123,17 +124,13 @@ export async function loadProject(args: LoadProjectArgs): Promise<LoadProjectRes
   });
 
   await core.group("ocx env", async () => {
-    const shellArg = process.platform === "win32" ? "powershell" : "bash";
-    let envOutput = "";
-    await exec.exec(ocxBin, ["--project", inputs.projectFile, "env", `--shell=${shellArg}`], {
+    // `--ci=github` makes ocx append tool dirs + vars straight to
+    // $GITHUB_PATH / $GITHUB_ENV — the same channel core.addPath /
+    // core.exportVariable write to. Explicit `=github` avoids ocx's
+    // provider autodetect (exit 64) and is OS-agnostic.
+    await exec.exec(ocxBin, ["--project", inputs.projectFile, "env", "--ci=github"], {
       cwd: inputs.workingDirectory,
-      listeners: {
-        stdout: (data) => {
-          envOutput += data.toString();
-        },
-      },
     });
-    applyShellExports(envOutput, shellArg);
   });
 
   // Hand off to the post step.
@@ -144,65 +141,4 @@ export async function loadProject(args: LoadProjectArgs): Promise<LoadProjectRes
   }
 
   return { cacheKey, cacheHit };
-}
-
-/**
- * Parse the output of `ocx env --shell=<bash|powershell>` and translate it
- * into GitHub Actions env mutations.
- *
- * bash form:    `export PATH="X:${PATH}"` or `export FOO="bar"`
- * powershell:   `$env:PATH = "X;$env:PATH"` or `$env:FOO = "bar"`
- *
- * PATH-style assignments (prepending to an existing PATH value) are split
- * into individual entries and pushed via core.addPath so they survive into
- * later steps. Plain assignments go through core.exportVariable.
- */
-export function applyShellExports(text: string, shell: "bash" | "powershell"): void {
-  const lines = text.split(/\r?\n/);
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-
-    if (shell === "bash") {
-      const m = /^export\s+([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(trimmed);
-      if (!m?.[1] || m[2] === undefined) continue;
-      const name = m[1];
-      const value = unquoteBash(m[2]);
-      applyAssignment(name, value, /[:]\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$/);
-    } else {
-      const m = /^\$env:([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(trimmed);
-      if (!m?.[1] || m[2] === undefined) continue;
-      const name = m[1];
-      const value = unquotePs(m[2]);
-      applyAssignment(name, value, /;\$env:[A-Za-z_][A-Za-z0-9_]*$/);
-    }
-  }
-}
-
-function applyAssignment(name: string, value: string, prependTail: RegExp): void {
-  const tailMatch = prependTail.exec(value);
-  if (name === "PATH" && tailMatch) {
-    // Strip the trailing `:${PATH}` (or `;$env:PATH`) and push remaining entries.
-    const prefix = value.slice(0, tailMatch.index);
-    const sep = process.platform === "win32" ? ";" : ":";
-    for (const entry of prefix.split(sep)) {
-      if (entry) core.addPath(entry);
-    }
-  } else {
-    core.exportVariable(name, value);
-  }
-}
-
-function unquoteBash(raw: string): string {
-  let s = raw.trim();
-  if (s.startsWith('"') && s.endsWith('"')) s = s.slice(1, -1);
-  else if (s.startsWith("'") && s.endsWith("'")) s = s.slice(1, -1);
-  return s.replace(/\\(.)/g, "$1");
-}
-
-function unquotePs(raw: string): string {
-  let s = raw.trim();
-  if (s.startsWith('"') && s.endsWith('"')) s = s.slice(1, -1);
-  else if (s.startsWith("'") && s.endsWith("'")) s = s.slice(1, -1);
-  return s;
 }
