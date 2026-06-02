@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { cacheMocks, coreMocks, execMocks, inputState, resetMocks } from "./setup-mocks.js";
-import { applyShellExports, loadProject, readProjectInputs } from "../src/project.js";
+import { loadProject, readProjectInputs } from "../src/project.js";
 
 interface ExecCall {
   bin: string;
@@ -11,18 +11,13 @@ interface ExecCall {
   cwd?: string;
 }
 const execCalls: ExecCall[] = [];
-let envOutput = "";
 
 beforeEach(() => {
   resetMocks();
   execCalls.length = 0;
-  envOutput = 'export PATH="/opt/bun/bin:${PATH}"\nexport BUN_VERSION="1.3"\n';
   execMocks.exec.mockImplementation(
     async (bin: string, args?: string[], options?): Promise<number> => {
       execCalls.push({ bin, args: args ?? [], cwd: options?.cwd });
-      if (args?.includes("env") && options?.listeners?.stdout) {
-        options.listeners.stdout(Buffer.from(envOutput));
-      }
       return 0;
     },
   );
@@ -40,37 +35,6 @@ function tempDir(): string {
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
-
-describe("applyShellExports", () => {
-  test("splits bash PATH prepend into individual addPath calls", () => {
-    const text = ['export PATH="/a/b:/c/d:${PATH}"', 'export OCX_TOOL_FOO="bar"'].join("\n");
-    applyShellExports(text, "bash");
-    const sep = process.platform === "win32" ? ";" : ":";
-    if (sep === ":") {
-      expect(coreMocks.addPath).toHaveBeenCalledWith("/a/b");
-      expect(coreMocks.addPath).toHaveBeenCalledWith("/c/d");
-    }
-    expect(coreMocks.exportVariable).toHaveBeenCalledWith("OCX_TOOL_FOO", "bar");
-  });
-
-  test("ignores blank lines and comments", () => {
-    const text = '# header\n\n   \nexport FOO="bar"';
-    applyShellExports(text, "bash");
-    expect(coreMocks.exportVariable).toHaveBeenCalledTimes(1);
-  });
-
-  test("parses unquoted bash values", () => {
-    const text = "export FOO=baz";
-    applyShellExports(text, "bash");
-    expect(coreMocks.exportVariable).toHaveBeenCalledWith("FOO", "baz");
-  });
-
-  test("parses powershell exports", () => {
-    const text = ['$env:OCX_TOOL_FOO = "bar"', '$env:PATH = "C:\\a;C:\\b;$env:PATH"'].join("\n");
-    applyShellExports(text, "powershell");
-    expect(coreMocks.exportVariable).toHaveBeenCalledWith("OCX_TOOL_FOO", "bar");
-  });
-});
 
 describe("readProjectInputs", () => {
   test("returns null when project input is empty (opt-out)", () => {
@@ -171,10 +135,11 @@ describe("loadProject", () => {
       });
       expect(coreMocks.exportVariable).toHaveBeenCalledWith("OCX_HOME", home);
       expect(execCalls[0]?.args).toEqual(["--project", path.join(dir, "ocx.toml"), "pull"]);
-      expect(execCalls[1]?.args.slice(0, 3)).toEqual([
+      expect(execCalls[1]?.args).toEqual([
         "--project",
         path.join(dir, "ocx.toml"),
         "env",
+        "--ci=github",
       ]);
     } finally {
       fs.rmSync(dir, { recursive: true });
@@ -278,18 +243,17 @@ describe("loadProject", () => {
     }
   });
 
-  test("uses powershell shell on win32", async () => {
+  test("uses --ci=github for env regardless of platform", async () => {
     const oldPlatform = process.platform;
     Object.defineProperty(process, "platform", { value: "win32" });
     const dir = tempDir();
     const home = tempDir();
     fs.writeFileSync(path.join(dir, "ocx.toml"), "");
     fs.writeFileSync(path.join(dir, "ocx.lock"), "");
-    envOutput = '$env:PATH = "C:\\bun;$env:PATH"\n';
     try {
       await loadProject({
         ocxBin: "C:\\ocx\\ocx.exe",
-        ocxVersion: "0.3.1",
+        ocxVersion: "0.3.5",
         libc: "",
         inputs: {
           workingDirectory: dir,
@@ -302,7 +266,8 @@ describe("loadProject", () => {
         },
       });
       const envCall = execCalls.find((c) => c.args.includes("env"));
-      expect(envCall?.args).toContain("--shell=powershell");
+      expect(envCall?.args).toContain("--ci=github");
+      expect(envCall?.args.some((a) => a.startsWith("--shell"))).toBe(false);
     } finally {
       Object.defineProperty(process, "platform", { value: oldPlatform });
       fs.rmSync(dir, { recursive: true });

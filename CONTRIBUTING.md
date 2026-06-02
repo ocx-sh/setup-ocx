@@ -19,7 +19,7 @@ your `PATH`.
 | `src/version.ts`        | Version resolution (`"latest"` via GitHub API, with retry)            |
 | `src/download.ts`       | Download, checksum verification, extraction, binary cache overlay     |
 | `src/cache.ts`          | `$OCX_HOME` object store cache (selective dirs, lockfile-hash key)    |
-| `src/project.ts`        | `ocx.toml` discovery, `ocx pull`, `ocx env` parsing                   |
+| `src/project.ts`        | `ocx.toml` discovery, `ocx pull`, `ocx env --ci=github` activation    |
 | `src/http-retry.ts`     | Generic `withRetry()` helper (exp. backoff + Retry-After)             |
 | `ocx.toml` / `ocx.lock` | Project toolchain (used locally + by CI dogfood jobs)                 |
 | `tests/`                | Unit tests (bun:test)                                                 |
