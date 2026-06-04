@@ -106575,6 +106575,23 @@ function getTarget(options) {
   }
   return { target: `${archStr}-${os9}`, isWindows };
 }
+function uvVersionAtLeast(major, minor, patch, uv = process.versions.uv) {
+  const parts = uv.split(".").map((s) => Number.parseInt(s, 10) || 0);
+  const got = [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
+  const want = [major, minor, patch];
+  for (let i = 0; i < 3; i++) {
+    if (got[i] !== want[i]) return got[i] > want[i];
+  }
+  return true;
+}
+function guardWindowsProcessTitle(platform2 = process.platform, uv = process.versions.uv) {
+  if (platform2 !== "win32") return;
+  if (uvVersionAtLeast(1, 52, 1, uv)) return;
+  try {
+    process.title = "setup-ocx";
+  } catch {
+  }
+}
 function getArchiveName(target, isWindows) {
   const ext = isWindows ? ".zip" : ".tar.xz";
   return `ocx-${target}${ext}`;
@@ -108207,6 +108224,7 @@ function compareVersions(a, b) {
 }
 async function run() {
   try {
+    guardWindowsProcessTitle();
     const versionInput = getInput("version");
     const token = getInput("github-token");
     const libcInput = getInput("libc");

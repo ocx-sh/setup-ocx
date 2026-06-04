@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { cacheMocks, coreMocks, inputState, resetMocks } from "./setup-mocks.js";
-import { run } from "../src/save-cache.js";
+import { reportPostFailure, run } from "../src/save-cache.js";
 
 beforeEach(() => {
   resetMocks();
@@ -88,5 +88,19 @@ describe("save-cache post step", () => {
     cacheMocks.isFeatureAvailable.mockImplementation(() => false);
     await run();
     expect(cacheMocks.saveCache.mock.calls.find((c) => c[1] === "store-key")).toBeUndefined();
+  });
+});
+
+describe("reportPostFailure (top-level handler)", () => {
+  test("warns with the message for an Error and never fails the job", () => {
+    reportPostFailure(new Error("boom"));
+    expect(coreMocks.warning).toHaveBeenCalledWith(expect.stringContaining("boom"));
+    expect(coreMocks.setFailed).not.toHaveBeenCalled();
+  });
+
+  test("warns with the stringified value for a non-Error", () => {
+    reportPostFailure("stringy failure");
+    expect(coreMocks.warning).toHaveBeenCalledWith(expect.stringContaining("stringy failure"));
+    expect(coreMocks.setFailed).not.toHaveBeenCalled();
   });
 });
