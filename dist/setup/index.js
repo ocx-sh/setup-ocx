@@ -105288,6 +105288,80 @@ __export(setup_exports, {
 });
 module.exports = __toCommonJS(setup_exports);
 
+// src/constants.ts
+var fs = __toESM(require("node:fs"), 1);
+var REPO_OWNER = "ocx-sh";
+var REPO_NAME = "ocx";
+var ARCH_MAP = {
+  x64: "x86_64",
+  arm64: "aarch64"
+};
+function detectLibc(libDir = "/lib") {
+  try {
+    const entries = fs.readdirSync(libDir);
+    if (entries.some((e) => e.startsWith("ld-musl"))) {
+      return "musl";
+    }
+  } catch {
+  }
+  return "gnu";
+}
+function getTarget(options) {
+  const platform2 = options?.platform ?? process.platform;
+  const arch3 = options?.arch ?? process.arch;
+  const archStr = ARCH_MAP[arch3];
+  if (!archStr) {
+    throw new Error(`Unsupported architecture: ${arch3}`);
+  }
+  const isWindows = platform2 === "win32";
+  let os9;
+  switch (platform2) {
+    case "linux": {
+      const libcVariant = options?.libc ?? detectLibc();
+      os9 = `unknown-linux-${libcVariant}`;
+      break;
+    }
+    case "darwin":
+      os9 = "apple-darwin";
+      break;
+    case "win32":
+      os9 = "pc-windows-msvc";
+      break;
+    default:
+      throw new Error(`Unsupported platform: ${platform2}`);
+  }
+  return { target: `${archStr}-${os9}`, isWindows };
+}
+function uvVersionAtLeast(major, minor, patch, uv = process.versions.uv) {
+  const parts = uv.split(".").map((s) => Number.parseInt(s, 10) || 0);
+  const got = [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
+  const want = [major, minor, patch];
+  for (let i = 0; i < 3; i++) {
+    const g = got[i] ?? 0;
+    const w = want[i] ?? 0;
+    if (g !== w) return g > w;
+  }
+  return true;
+}
+function guardWindowsProcessTitle(platform2 = process.platform, uv = process.versions.uv) {
+  if (platform2 !== "win32") return;
+  if (uvVersionAtLeast(1, 52, 1, uv)) return;
+  try {
+    process.title = "setup-ocx";
+  } catch {
+  }
+}
+function getArchiveName(target, isWindows) {
+  const ext = isWindows ? ".zip" : ".tar.xz";
+  return `ocx-${target}${ext}`;
+}
+function getDownloadUrl(version2, filename) {
+  return `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v${version2}/${filename}`;
+}
+
+// src/win-title-guard.ts
+guardWindowsProcessTitle();
+
 // node_modules/@actions/core/lib/command.js
 var os = __toESM(require("os"), 1);
 
@@ -105364,17 +105438,17 @@ function escapeProperty(s) {
 
 // node_modules/@actions/core/lib/file-command.js
 var crypto2 = __toESM(require("crypto"), 1);
-var fs = __toESM(require("fs"), 1);
+var fs2 = __toESM(require("fs"), 1);
 var os2 = __toESM(require("os"), 1);
 function issueFileCommand(command, message) {
   const filePath = process.env[`GITHUB_${command}`];
   if (!filePath) {
     throw new Error(`Unable to find environment variable for file command ${command}`);
   }
-  if (!fs.existsSync(filePath)) {
+  if (!fs2.existsSync(filePath)) {
     throw new Error(`Missing file at path: ${filePath}`);
   }
-  fs.appendFileSync(filePath, `${toCommandValue(message)}${os2.EOL}`, {
+  fs2.appendFileSync(filePath, `${toCommandValue(message)}${os2.EOL}`, {
     encoding: "utf8"
   });
 }
@@ -106391,10 +106465,10 @@ var summary = _summary;
 var import_os2 = __toESM(require("os"), 1);
 
 // node_modules/@actions/core/node_modules/@actions/exec/node_modules/@actions/io/lib/io-util.js
-var fs2 = __toESM(require("fs"), 1);
-var { chmod, copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, symlink, unlink } = fs2.promises;
+var fs3 = __toESM(require("fs"), 1);
+var { chmod, copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, symlink, unlink } = fs3.promises;
 var IS_WINDOWS = process.platform === "win32";
-var READONLY = fs2.constants.O_RDONLY;
+var READONLY = fs3.constants.O_RDONLY;
 
 // node_modules/@actions/core/node_modules/@actions/exec/lib/toolrunner.js
 var IS_WINDOWS2 = process.platform === "win32";
@@ -106530,75 +106604,6 @@ function saveState(name, value) {
 
 // src/setup.ts
 var path9 = __toESM(require("node:path"), 1);
-
-// src/constants.ts
-var fs3 = __toESM(require("node:fs"), 1);
-var REPO_OWNER = "ocx-sh";
-var REPO_NAME = "ocx";
-var ARCH_MAP = {
-  x64: "x86_64",
-  arm64: "aarch64"
-};
-function detectLibc(libDir = "/lib") {
-  try {
-    const entries = fs3.readdirSync(libDir);
-    if (entries.some((e) => e.startsWith("ld-musl"))) {
-      return "musl";
-    }
-  } catch {
-  }
-  return "gnu";
-}
-function getTarget(options) {
-  const platform2 = options?.platform ?? process.platform;
-  const arch3 = options?.arch ?? process.arch;
-  const archStr = ARCH_MAP[arch3];
-  if (!archStr) {
-    throw new Error(`Unsupported architecture: ${arch3}`);
-  }
-  const isWindows = platform2 === "win32";
-  let os9;
-  switch (platform2) {
-    case "linux": {
-      const libcVariant = options?.libc ?? detectLibc();
-      os9 = `unknown-linux-${libcVariant}`;
-      break;
-    }
-    case "darwin":
-      os9 = "apple-darwin";
-      break;
-    case "win32":
-      os9 = "pc-windows-msvc";
-      break;
-    default:
-      throw new Error(`Unsupported platform: ${platform2}`);
-  }
-  return { target: `${archStr}-${os9}`, isWindows };
-}
-function uvVersionAtLeast(major, minor, patch, uv = process.versions.uv) {
-  const parts = uv.split(".").map((s) => Number.parseInt(s, 10) || 0);
-  const got = [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
-  const want = [major, minor, patch];
-  for (let i = 0; i < 3; i++) {
-    if (got[i] !== want[i]) return got[i] > want[i];
-  }
-  return true;
-}
-function guardWindowsProcessTitle(platform2 = process.platform, uv = process.versions.uv) {
-  if (platform2 !== "win32") return;
-  if (uvVersionAtLeast(1, 52, 1, uv)) return;
-  try {
-    process.title = "setup-ocx";
-  } catch {
-  }
-}
-function getArchiveName(target, isWindows) {
-  const ext = isWindows ? ".zip" : ".tar.xz";
-  return `ocx-${target}${ext}`;
-}
-function getDownloadUrl(version2, filename) {
-  return `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v${version2}/${filename}`;
-}
 
 // src/download.ts
 var cache = __toESM(require_cache5(), 1);
@@ -108224,7 +108229,6 @@ function compareVersions(a, b) {
 }
 async function run() {
   try {
-    guardWindowsProcessTitle();
     const versionInput = getInput("version");
     const token = getInput("github-token");
     const libcInput = getInput("libc");

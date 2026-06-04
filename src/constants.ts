@@ -77,7 +77,9 @@ export function uvVersionAtLeast(
   const got: [number, number, number] = [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
   const want: [number, number, number] = [major, minor, patch];
   for (let i = 0; i < 3; i++) {
-    if (got[i] !== want[i]) return got[i] > want[i];
+    const g = got[i] ?? 0;
+    const w = want[i] ?? 0;
+    if (g !== w) return g > w;
   }
   return true;
 }
@@ -88,18 +90,26 @@ export function uvVersionAtLeast(
  *
  *     Assertion failed: process_title, file src\win\util.c, line 412
  *
- * Root cause: on Windows, `uv_get_process_title` reads the console title via
- * `GetConsoleTitle`, which returns `0` for BOTH an error AND an empty title.
- * libuv < 1.52.1 conflates the two, leaves its cached `process_title` NULL, and
- * the next read trips `assert(process_title)` → `abort()`. A fresh CI console
- * often has an empty title, so the post step inherits the bad state. The abort
- * is C-level and fires *inside the getter*, so it cannot be caught from JS, nor
- * can `process.title` be read to probe — the read is the crash.
+ * Root cause: on Windows, `uv_get_process_title` lazily reads the console title
+ * via `GetConsoleTitleW`. When a console IS attached but its title is EMPTY,
+ * `GetConsoleTitleW` returns length `0` and `GetLastError()` is `0`, so libuv's
+ * `uv_translate_sys_error(0)` yields success (`0`) while leaving its cached
+ * `process_title` NULL. Control then falls through to `assert(process_title)`
+ * → `abort()`. (With NO console attached, `GetLastError()` is non-zero, libuv
+ * returns a real error, and there is no abort — the crash needs the precise
+ * "console present, title empty" state a fresh CI console can have.)
  *
- * The setter (`uv_set_process_title`) has no assert. Setting a NON-EMPTY title
- * populates libuv's cache, so the later getter returns the cached value instead
- * of re-querying the empty console title. Idempotent and safe: it never
- * re-introduces the empty-title state, and helps later steps too.
+ * The setter (`uv_set_process_title`) calls `SetConsoleTitleW`, which SUCCEEDS
+ * whenever a console is attached — exactly the state that triggers the abort —
+ * and only then assigns `process_title`. So setting a non-empty title populates
+ * libuv's cache; every later getter returns the cached value and never re-reads
+ * the empty console title. Idempotent and safe.
+ *
+ * Timing is critical: the first crashing getter can fire during MODULE
+ * EVALUATION of a bundled `@actions/*` dependency, before any entry-point
+ * `run()` body executes. The guard is therefore invoked from `win-title-guard.ts`,
+ * a side-effect import placed ahead of all `@actions/*` imports — not from
+ * inside `run()`, which is already too late.
  *
  * Gated tightly — Windows only, and only on the affected libuv versions — so it
  * is a complete no-op once GitHub ships a runtime with the upstream fix.

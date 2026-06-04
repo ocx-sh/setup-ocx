@@ -1,6 +1,9 @@
+// Must be first: preempts the libuv `process_title` abort on Windows before any
+// `@actions/*` module body evaluates. The post step's console title is empty on
+// `windows-11-arm`, and @actions/cache's save path is where the abort fires.
+import "./win-title-guard.js";
 import * as core from "@actions/core";
 import { saveObjectStoreCache } from "./cache.js";
-import { guardWindowsProcessTitle } from "./constants.js";
 import { saveBinaryCache } from "./download.js";
 
 /**
@@ -18,11 +21,6 @@ import { saveBinaryCache } from "./download.js";
  * Save failures degrade to warnings — they must never fail the user's job.
  */
 export async function run(): Promise<void> {
-  // Preempt the libuv `process_title` abort before touching @actions/cache,
-  // which spawns child processes and is a common trigger on Windows runners
-  // with an empty console title. No-op off Windows / on patched libuv.
-  guardWindowsProcessTitle();
-
   // 1. Project object store.
   const tcKey = core.getState("cache-key");
   const ocxHome = core.getState("ocx-home");

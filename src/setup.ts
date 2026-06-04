@@ -1,6 +1,9 @@
+// Must be first: preempts the libuv `process_title` abort on Windows before any
+// `@actions/*` module body evaluates and can trigger the crashing title read.
+import "./win-title-guard.js";
 import * as core from "@actions/core";
 import * as path from "node:path";
-import { detectLibc, guardWindowsProcessTitle } from "./constants.js";
+import { detectLibc } from "./constants.js";
 import type { Libc } from "./constants.js";
 import { downloadOcx } from "./download.js";
 import { loadProject, readProjectInputs } from "./project.js";
@@ -32,10 +35,6 @@ export function compareVersions(a: string, b: string): number {
 
 export async function run(): Promise<void> {
   try {
-    // Preempt the libuv `process_title` abort on affected Windows runtimes
-    // before any console-title read can crash the process. No-op elsewhere.
-    guardWindowsProcessTitle();
-
     const versionInput = core.getInput("version");
     const token = core.getInput("github-token");
     const libcInput = core.getInput("libc");
