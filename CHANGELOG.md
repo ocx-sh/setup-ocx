@@ -2,11 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.2](https://github.com/ocx-sh/setup-ocx/releases/tag/v1.2.2) — 2026-06-04
+
+### Fixed
+
+- **windows:** Run process_title guard before @actions/* module eval by @michael-herwig ([5660453](https://github.com/ocx-sh/setup-ocx/commit/5660453ed4c89de0a85c558eadc7f0694b93d494))
 ## [1.2.1](https://github.com/ocx-sh/setup-ocx/releases/tag/v1.2.1) — 2026-06-04
 
 ### Fixed
 
 - **windows:** Preempt libuv process_title abort on affected runtimes by @michael-herwig ([85921df](https://github.com/ocx-sh/setup-ocx/commit/85921df63b8aa8ed392cf3410c5fcbee2259525e))
+
+### Release
+
+- V1.2.1 by @michael-herwig ([9449e63](https://github.com/ocx-sh/setup-ocx/commit/9449e638272bad5400c4f8f70c2a1ff6b14573b8))
 ## [1.2.0](https://github.com/ocx-sh/setup-ocx/releases/tag/v1.2.0) — 2026-06-02
 
 ### Added
