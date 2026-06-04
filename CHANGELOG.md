@@ -2,11 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.1](https://github.com/ocx-sh/setup-ocx/releases/tag/v1.2.1) — 2026-06-04
+
+### Fixed
+
+- **windows:** Preempt libuv process_title abort on affected runtimes by @michael-herwig ([85921df](https://github.com/ocx-sh/setup-ocx/commit/85921df63b8aa8ed392cf3410c5fcbee2259525e))
 ## [1.2.0](https://github.com/ocx-sh/setup-ocx/releases/tag/v1.2.0) — 2026-06-02
 
 ### Added
 
 - Adopt ocx env --ci=github for project activation by @michael-herwig ([e50c641](https://github.com/ocx-sh/setup-ocx/commit/e50c641bc36de3822131bbe44da051283e16af32))
+
+### Release
+
+- V1.2.0 by @michael-herwig ([3b557ac](https://github.com/ocx-sh/setup-ocx/commit/3b557acf1399507e6b6a8db15055715c3e214515))
 ## [1.1.0](https://github.com/ocx-sh/setup-ocx/releases/tag/v1.1.0) — 2026-05-28
 
 ### Added
