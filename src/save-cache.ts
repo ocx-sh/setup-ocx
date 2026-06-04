@@ -1,5 +1,6 @@
 import * as core from "@actions/core";
 import { saveObjectStoreCache } from "./cache.js";
+import { guardWindowsProcessTitle } from "./constants.js";
 import { saveBinaryCache } from "./download.js";
 
 /**
@@ -17,6 +18,11 @@ import { saveBinaryCache } from "./download.js";
  * Save failures degrade to warnings — they must never fail the user's job.
  */
 export async function run(): Promise<void> {
+  // Preempt the libuv `process_title` abort before touching @actions/cache,
+  // which spawns child processes and is a common trigger on Windows runners
+  // with an empty console title. No-op off Windows / on patched libuv.
+  guardWindowsProcessTitle();
+
   // 1. Project object store.
   const tcKey = core.getState("cache-key");
   const ocxHome = core.getState("ocx-home");
@@ -35,6 +41,12 @@ export async function run(): Promise<void> {
   }
 }
 
-run().catch((err: unknown) => {
+/**
+ * Top-level failure handler for the post step. A post-step failure must never
+ * fail the user's job, so anything that escapes `run()` degrades to a warning.
+ */
+export function reportPostFailure(err: unknown): void {
   core.warning(`setup-ocx post step failed: ${err instanceof Error ? err.message : String(err)}`);
-});
+}
+
+run().catch(reportPostFailure);

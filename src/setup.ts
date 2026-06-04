@@ -1,6 +1,6 @@
 import * as core from "@actions/core";
 import * as path from "node:path";
-import { detectLibc } from "./constants.js";
+import { detectLibc, guardWindowsProcessTitle } from "./constants.js";
 import type { Libc } from "./constants.js";
 import { downloadOcx } from "./download.js";
 import { loadProject, readProjectInputs } from "./project.js";
@@ -32,6 +32,10 @@ export function compareVersions(a: string, b: string): number {
 
 export async function run(): Promise<void> {
   try {
+    // Preempt the libuv `process_title` abort on affected Windows runtimes
+    // before any console-title read can crash the process. No-op elsewhere.
+    guardWindowsProcessTitle();
+
     const versionInput = core.getInput("version");
     const token = core.getInput("github-token");
     const libcInput = core.getInput("libc");

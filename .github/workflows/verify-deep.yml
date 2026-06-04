@@ -106,3 +106,36 @@ jobs:
         run: |
           bun --version
           node --version
+
+  # Regression guard for the libuv `process_title` abort on Windows. Affected
+  # runtimes (libuv < 1.52.1) crash any Node process that reads an empty console
+  # title — including this action's post step, inside @actions/cache's save path.
+  # The abort is C-level and uncatchable from JS, so the guard preempts it by
+  # setting a non-empty process.title before the cache runs. The assertion here
+  # is implicit: if the post step aborts, the *job* goes red. A green job (which
+  # DOES run the cache save) proves the workaround holds. Runs on Windows arm64
+  # (newest image, where it was first observed) but the bug is not arch-specific.
+  verify-windows-arm:
+    name: Verify windows-arm64 post step does not abort
+    runs-on: windows-11-arm
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - name: Setup OCX (exercises the cache-save path the abort fires in)
+        id: setup
+        uses: ./
+        with:
+          version: latest
+          # Binary-only: project activation needs win-arm64 toolchain builds
+          # that are out of scope for this regression test.
+          project: ""
+          cache-suffix: ${{ github.run_id }}
+      - name: Verify binary works
+        shell: bash
+        run: ocx version
+      - name: Verify project not activated (binary-only mode)
+        shell: bash
+        env:
+          PROJECT_LOADED: ${{ steps.setup.outputs.project-loaded }}
+        run: test "$PROJECT_LOADED" = "false"

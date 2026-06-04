@@ -1,8 +1,15 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { detectLibc, getArchiveName, getDownloadUrl, getTarget } from "../src/constants.js";
+import {
+  detectLibc,
+  getArchiveName,
+  getDownloadUrl,
+  getTarget,
+  guardWindowsProcessTitle,
+  uvVersionAtLeast,
+} from "../src/constants.js";
 
 describe("getTarget", () => {
   // Linux with explicit libc
@@ -122,6 +129,59 @@ describe("detectLibc", () => {
 
   test("returns gnu when directory does not exist", () => {
     expect(detectLibc("/nonexistent-path-that-does-not-exist")).toBe("gnu");
+  });
+});
+
+describe("uvVersionAtLeast", () => {
+  test("true when patch equals the floor", () => {
+    expect(uvVersionAtLeast(1, 52, 1, "1.52.1")).toBe(true);
+  });
+
+  test("true when above the floor (minor)", () => {
+    expect(uvVersionAtLeast(1, 52, 1, "1.53.0")).toBe(true);
+  });
+
+  test("true when above the floor (major)", () => {
+    expect(uvVersionAtLeast(1, 52, 1, "2.0.0")).toBe(true);
+  });
+
+  test("false just below the floor (patch)", () => {
+    expect(uvVersionAtLeast(1, 52, 1, "1.52.0")).toBe(false);
+  });
+
+  test("false below the floor (minor)", () => {
+    expect(uvVersionAtLeast(1, 52, 1, "1.51.0")).toBe(false);
+  });
+
+  test("treats empty/garbage version as 0.0.0 (below floor)", () => {
+    expect(uvVersionAtLeast(1, 52, 1, "")).toBe(false);
+    expect(uvVersionAtLeast(1, 52, 1, "not-a-version")).toBe(false);
+  });
+});
+
+describe("guardWindowsProcessTitle", () => {
+  // Save/restore the real process title so these cases don't leak.
+  const original = process.title;
+  afterEach(() => {
+    process.title = original;
+  });
+
+  test("sets a non-empty title on Windows with affected libuv (< 1.52.1)", () => {
+    process.title = "";
+    guardWindowsProcessTitle("win32", "1.51.0");
+    expect(process.title).toBe("setup-ocx");
+  });
+
+  test("no-op on Windows with patched libuv (>= 1.52.1)", () => {
+    process.title = "sentinel";
+    guardWindowsProcessTitle("win32", "1.52.1");
+    expect(process.title).toBe("sentinel");
+  });
+
+  test("no-op off Windows even on affected libuv", () => {
+    process.title = "sentinel";
+    guardWindowsProcessTitle("linux", "1.40.0");
+    expect(process.title).toBe("sentinel");
   });
 });
 

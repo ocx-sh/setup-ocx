@@ -105283,6 +105283,7 @@ var require_semver3 = __commonJS({
 // src/save-cache.ts
 var save_cache_exports = {};
 __export(save_cache_exports, {
+  reportPostFailure: () => reportPostFailure,
   run: () => run
 });
 module.exports = __toCommonJS(save_cache_exports);
@@ -105753,6 +105754,25 @@ async function saveObjectStoreCache(ocxHome, key) {
   }
 }
 
+// src/constants.ts
+function uvVersionAtLeast(major, minor, patch, uv = process.versions.uv) {
+  const parts = uv.split(".").map((s) => Number.parseInt(s, 10) || 0);
+  const got = [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
+  const want = [major, minor, patch];
+  for (let i = 0; i < 3; i++) {
+    if (got[i] !== want[i]) return got[i] > want[i];
+  }
+  return true;
+}
+function guardWindowsProcessTitle(platform2 = process.platform, uv = process.versions.uv) {
+  if (platform2 !== "win32") return;
+  if (uvVersionAtLeast(1, 52, 1, uv)) return;
+  try {
+    process.title = "setup-ocx";
+  } catch {
+  }
+}
+
 // src/download.ts
 var cache2 = __toESM(require_cache5(), 1);
 
@@ -105789,6 +105809,7 @@ async function saveBinaryCache(cachePath, key) {
 
 // src/save-cache.ts
 async function run() {
+  guardWindowsProcessTitle();
   const tcKey = getState("cache-key");
   const ocxHome = getState("ocx-home");
   const tcHit = getState("cache-hit") === "true";
@@ -105803,11 +105824,13 @@ async function run() {
     await saveBinaryCache(binPath, binKey);
   }
 }
-run().catch((err) => {
+function reportPostFailure(err) {
   warning(`setup-ocx post step failed: ${err instanceof Error ? err.message : String(err)}`);
-});
+}
+run().catch(reportPostFailure);
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  reportPostFailure,
   run
 });
 /*! Bundled license information:
