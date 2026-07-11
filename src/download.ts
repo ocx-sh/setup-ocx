@@ -4,8 +4,14 @@ import * as tc from "@actions/tool-cache";
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { getArchiveName, getDownloadUrl, getTarget } from "./constants.js";
+import { getArchiveCandidates, getDownloadUrl, getTarget } from "./constants.js";
 import type { Libc } from "./constants.js";
+
+/** True when `err` is an @actions/tool-cache download error with HTTP status 404. */
+function isNotFound(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  return (err as { httpStatusCode?: unknown }).httpStatusCode === 404;
+}
 
 export interface DownloadResult {
   binDir: string;
@@ -47,11 +53,10 @@ export async function downloadOcx(
   options?: DownloadOptions,
 ): Promise<DownloadResult> {
   const { target, isWindows } = getTarget(libc !== undefined ? { libc } : {});
-  const archiveName = getArchiveName(target, isWindows);
+  const candidates = getArchiveCandidates(target, isWindows);
   const cacheEnabled = options?.cache ?? true;
 
   core.info(`Target: ${target}`);
-  core.debug(`Archive: ${archiveName}`);
 
   // 1. Fast path: intra-job tool-cache.
   const cached = tc.find("ocx", version, process.arch);
@@ -92,23 +97,37 @@ export async function downloadOcx(
   }
 
   // 3. Download + verify + extract + cache locally.
-  const archiveUrl = getDownloadUrl(version, archiveName);
-  core.info(`Downloading OCX ${version} from ${archiveUrl}`);
-
-  const archivePath = await tc.downloadTool(
-    archiveUrl,
-    undefined,
-    token ? `Bearer ${token}` : undefined,
-  );
+  // Try each archive format in order (new .tar.gz first, legacy .tar.xz
+  // fallback); only a 404 falls through to the next candidate — any other
+  // error (transient 5xx etc.) propagates.
+  const auth = token ? `Bearer ${token}` : undefined;
+  let archivePath: string | undefined;
+  let archiveName: string | undefined;
+  for (let i = 0; i < candidates.length; i++) {
+    const name = candidates[i] ?? "";
+    const url = getDownloadUrl(version, name);
+    core.info(`Downloading OCX ${version} from ${url}`);
+    try {
+      archivePath = await tc.downloadTool(url, undefined, auth);
+      archiveName = name;
+      break;
+    } catch (err) {
+      if (isNotFound(err) && i < candidates.length - 1) {
+        core.info(`Archive ${name} not found (404); trying next format...`);
+        continue;
+      }
+      throw err;
+    }
+  }
+  // Unreachable: the loop returns an archive or rethrows on the last candidate.
+  if (archivePath === undefined || archiveName === undefined) {
+    throw new Error(`No archive candidate resolved for OCX ${version}`);
+  }
 
   const checksumUrl = getDownloadUrl(version, `${archiveName}.sha256`);
   core.info(`Verifying checksum from ${checksumUrl}`);
 
-  const checksumPath = await tc.downloadTool(
-    checksumUrl,
-    undefined,
-    token ? `Bearer ${token}` : undefined,
-  );
+  const checksumPath = await tc.downloadTool(checksumUrl, undefined, auth);
   const checksumContent = fs.readFileSync(checksumPath, "utf8").trim();
   const expectedHash = checksumContent.split(/\s+/)[0] ?? "";
   if (!expectedHash) {

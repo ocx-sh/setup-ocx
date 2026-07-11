@@ -11,8 +11,8 @@ import { cacheMocks, coreMocks, resetMocks, tcMocks } from "./setup-mocks.js";
 const getTargetMock = mock(() => ({ target: "x86_64-unknown-linux-gnu", isWindows: false }));
 mock.module("../src/constants.js", () => ({
   getTarget: getTargetMock,
-  getArchiveName: (target: string, isWindows: boolean) =>
-    `ocx-${target}${isWindows ? ".zip" : ".tar.xz"}`,
+  getArchiveCandidates: (target: string, isWindows: boolean) =>
+    isWindows ? [`ocx-${target}.zip`] : [`ocx-${target}.tar.gz`, `ocx-${target}.tar.xz`],
   getDownloadUrl: (version: string, filename: string) =>
     `https://github.com/ocx-sh/ocx/releases/download/v${version}/${filename}`,
   detectLibc: () => "gnu" as const,
@@ -448,9 +448,9 @@ describe("downloadOcx", () => {
     }
   });
 
-  test("uses extractTar with xJ flags for .tar.xz archives", async () => {
+  test("uses extractTar with xz flags for .tar.gz archives", async () => {
     const tmpDir = makeTempDir("test-download");
-    const archivePath = path.join(tmpDir, "archive.tar.xz");
+    const archivePath = path.join(tmpDir, "archive.tar.gz");
     const checksumPath = path.join(tmpDir, "archive.sha256");
     const extractedDir = makeTempDir("test-extracted");
     const cachedDir = makeTempDir("test-cached");
@@ -477,12 +477,66 @@ describe("downloadOcx", () => {
       const callArgs = tcMocks.extractTar.mock.calls[0];
       expect(callArgs).toBeDefined();
       expect(callArgs![0]).toBe(archivePath);
+      expect(callArgs![2]).toBe("xz");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true });
+      fs.rmSync(extractedDir, { recursive: true });
+      fs.rmSync(cachedDir, { recursive: true });
+    }
+  });
+
+  test("falls back to .tar.xz on 404 and uses xJ flags", async () => {
+    const tmpDir = makeTempDir("test-download");
+    const archivePath = path.join(tmpDir, "archive.tar.xz");
+    const checksumPath = path.join(tmpDir, "archive.sha256");
+    const extractedDir = makeTempDir("test-extracted");
+    const cachedDir = makeTempDir("test-cached");
+
+    const archiveContent = Buffer.from("content");
+    fs.writeFileSync(archivePath, archiveContent);
+    const hash = crypto.createHash("sha256").update(archiveContent).digest("hex");
+    fs.writeFileSync(checksumPath, hash);
+
+    fs.writeFileSync(path.join(extractedDir, "ocx"), "");
+    fs.writeFileSync(path.join(cachedDir, "ocx"), "");
+
+    const urls: string[] = [];
+    tcMocks.downloadTool.mockImplementation((url: string) => {
+      urls.push(url);
+      if (url.endsWith(".tar.gz")) {
+        return Promise.reject(Object.assign(new Error("Not Found"), { httpStatusCode: 404 }));
+      }
+      if (url.endsWith(".tar.xz")) return Promise.resolve(archivePath);
+      return Promise.resolve(checksumPath); // .sha256
+    });
+    tcMocks.extractTar.mockImplementation(() => Promise.resolve(extractedDir));
+    tcMocks.cacheDir.mockImplementation(() => Promise.resolve(cachedDir));
+
+    try {
+      await downloadOcx("0.2.0", "");
+      expect(urls.some((u) => u.endsWith(".tar.gz"))).toBe(true);
+      expect(urls.some((u) => u.endsWith(".tar.xz"))).toBe(true);
+      expect(tcMocks.extractTar).toHaveBeenCalledTimes(1);
+      const callArgs = tcMocks.extractTar.mock.calls[0];
+      expect(callArgs![0]).toBe(archivePath);
       expect(callArgs![2]).toBe("xJ");
     } finally {
       fs.rmSync(tmpDir, { recursive: true });
       fs.rmSync(extractedDir, { recursive: true });
       fs.rmSync(cachedDir, { recursive: true });
     }
+  });
+
+  test("does not fall back on a non-404 error", async () => {
+    const urls: string[] = [];
+    tcMocks.downloadTool.mockImplementation((url: string) => {
+      urls.push(url);
+      return Promise.reject(Object.assign(new Error("Server Error"), { httpStatusCode: 500 }));
+    });
+
+    await expect(downloadOcx("0.2.0", "")).rejects.toThrow(/Server Error/);
+    expect(urls.some((u) => u.endsWith(".tar.gz"))).toBe(true);
+    expect(urls.some((u) => u.endsWith(".tar.xz"))).toBe(false);
   });
 
   test("uses extractZip for Windows .zip archives", async () => {

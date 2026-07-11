@@ -105351,9 +105351,9 @@ function guardWindowsProcessTitle(platform2 = process.platform, uv = process.ver
   } catch {
   }
 }
-function getArchiveName(target, isWindows) {
-  const ext = isWindows ? ".zip" : ".tar.xz";
-  return `ocx-${target}${ext}`;
+function getArchiveCandidates(target, isWindows) {
+  if (isWindows) return [`ocx-${target}.zip`];
+  return [`ocx-${target}.tar.gz`, `ocx-${target}.tar.xz`];
 }
 function getDownloadUrl(version2, filename) {
   return `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/v${version2}/${filename}`;
@@ -107866,6 +107866,10 @@ function _getGlobal(key, defaultValue) {
 var crypto4 = __toESM(require("node:crypto"), 1);
 var fs7 = __toESM(require("node:fs"), 1);
 var path6 = __toESM(require("node:path"), 1);
+function isNotFound(err) {
+  if (typeof err !== "object" || err === null) return false;
+  return err.httpStatusCode === 404;
+}
 function binaryCacheKey(target, version2) {
   return `setup-ocx-bin-${target}-${version2}`;
 }
@@ -107876,10 +107880,9 @@ function toolCachePath(version2) {
 }
 async function downloadOcx(version2, token, libc, options) {
   const { target, isWindows } = getTarget(libc !== void 0 ? { libc } : {});
-  const archiveName = getArchiveName(target, isWindows);
+  const candidates = getArchiveCandidates(target, isWindows);
   const cacheEnabled = options?.cache ?? true;
   info(`Target: ${target}`);
-  debug(`Archive: ${archiveName}`);
   const cached = find("ocx", version2, process.arch);
   if (cached) {
     info(`Found cached OCX ${version2} at ${cached}`);
@@ -107913,20 +107916,31 @@ async function downloadOcx(version2, token, libc, options) {
       );
     }
   }
-  const archiveUrl = getDownloadUrl(version2, archiveName);
-  info(`Downloading OCX ${version2} from ${archiveUrl}`);
-  const archivePath = await downloadTool(
-    archiveUrl,
-    void 0,
-    token ? `Bearer ${token}` : void 0
-  );
+  const auth = token ? `Bearer ${token}` : void 0;
+  let archivePath;
+  let archiveName;
+  for (let i = 0; i < candidates.length; i++) {
+    const name = candidates[i] ?? "";
+    const url2 = getDownloadUrl(version2, name);
+    info(`Downloading OCX ${version2} from ${url2}`);
+    try {
+      archivePath = await downloadTool(url2, void 0, auth);
+      archiveName = name;
+      break;
+    } catch (err) {
+      if (isNotFound(err) && i < candidates.length - 1) {
+        info(`Archive ${name} not found (404); trying next format...`);
+        continue;
+      }
+      throw err;
+    }
+  }
+  if (archivePath === void 0 || archiveName === void 0) {
+    throw new Error(`No archive candidate resolved for OCX ${version2}`);
+  }
   const checksumUrl = getDownloadUrl(version2, `${archiveName}.sha256`);
   info(`Verifying checksum from ${checksumUrl}`);
-  const checksumPath = await downloadTool(
-    checksumUrl,
-    void 0,
-    token ? `Bearer ${token}` : void 0
-  );
+  const checksumPath = await downloadTool(checksumUrl, void 0, auth);
   const checksumContent = fs7.readFileSync(checksumPath, "utf8").trim();
   const expectedHash = checksumContent.split(/\s+/)[0] ?? "";
   if (!expectedHash) {

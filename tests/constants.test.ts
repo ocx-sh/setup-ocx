@@ -4,7 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import {
   detectLibc,
-  getArchiveName,
+  getArchiveCandidates,
   getDownloadUrl,
   getTarget,
   guardWindowsProcessTitle,
@@ -185,15 +185,18 @@ describe("guardWindowsProcessTitle", () => {
   });
 });
 
-describe("getArchiveName", () => {
-  test("unix archive uses .tar.xz", () => {
-    expect(getArchiveName("x86_64-unknown-linux-gnu", false)).toBe(
+describe("getArchiveCandidates", () => {
+  test("unix prefers .tar.gz then falls back to .tar.xz", () => {
+    expect(getArchiveCandidates("x86_64-unknown-linux-gnu", false)).toEqual([
+      "ocx-x86_64-unknown-linux-gnu.tar.gz",
       "ocx-x86_64-unknown-linux-gnu.tar.xz",
-    );
+    ]);
   });
 
-  test("windows archive uses .zip", () => {
-    expect(getArchiveName("x86_64-pc-windows-msvc", true)).toBe("ocx-x86_64-pc-windows-msvc.zip");
+  test("windows has a single .zip candidate", () => {
+    expect(getArchiveCandidates("x86_64-pc-windows-msvc", true)).toEqual([
+      "ocx-x86_64-pc-windows-msvc.zip",
+    ]);
   });
 });
 

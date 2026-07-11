@@ -131,9 +131,13 @@ export function guardWindowsProcessTitle(
   }
 }
 
-export function getArchiveName(target: string, isWindows: boolean): string {
-  const ext = isWindows ? ".zip" : ".tar.xz";
-  return `ocx-${target}${ext}`;
+/**
+ * Ordered archive-name candidates to try. Non-Windows: new `.tar.gz` first,
+ * legacy `.tar.xz` fallback. Windows: single `.zip`.
+ */
+export function getArchiveCandidates(target: string, isWindows: boolean): readonly string[] {
+  if (isWindows) return [`ocx-${target}.zip`];
+  return [`ocx-${target}.tar.gz`, `ocx-${target}.tar.xz`];
 }
 
 export function getDownloadUrl(version: string, filename: string): string {
