@@ -2,11 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0](https://github.com/ocx-sh/setup-ocx/releases/tag/v1.3.0) — 2026-07-11
+
+### Added
+
+- Support tar.gz archives with tar.xz fallback ([ae06166](https://github.com/ocx-sh/setup-ocx/commit/ae06166db67732f6633e63b28dd96d26a82def10))
 ## [1.2.2](https://github.com/ocx-sh/setup-ocx/releases/tag/v1.2.2) — 2026-06-04
 
 ### Fixed
 
 - **windows:** Run process_title guard before @actions/* module eval by @michael-herwig ([5660453](https://github.com/ocx-sh/setup-ocx/commit/5660453ed4c89de0a85c558eadc7f0694b93d494))
+
+### Release
+
+- V1.2.2 by @michael-herwig ([8cd2f38](https://github.com/ocx-sh/setup-ocx/commit/8cd2f38eed07c9b79aaed22e61f9ba6b36e967a3))
 ## [1.2.1](https://github.com/ocx-sh/setup-ocx/releases/tag/v1.2.1) — 2026-06-04
 
 ### Fixed
