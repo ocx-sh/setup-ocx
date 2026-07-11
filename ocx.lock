@@ -1,26 +1,57 @@
 [metadata]
-lock_version = 1
+lock_version = 2
 declaration_hash_version = 1
 declaration_hash = "sha256:37686f1020192de1a8911e655f150665f2006a07b5d86cfd307b2abc99edbf71"
-generated_by = "ocx 0.3.1"
-generated_at = "2026-05-28T14:59:21Z"
+generated_by = "ocx 0.4.3"
+generated_at = "2026-07-11T12:25:10Z"
 
 [[tool]]
 name = "bun"
 group = "default"
-pinned = "ocx.sh/bun@sha256:83acea5455ed13df3aa1e2e4b7574a71fa5164c0c029f03b03209e2a1312af02"
+repository = "ocx.sh/bun"
+
+[tool.platforms]
+"darwin/amd64" = "sha256:73859a95fa82f71de199638e3bd26e7abc524996fe48b3e074525f405fc60255"
+"darwin/arm64" = "sha256:c3ce54c6567b9910dfe31255ae62f1321674b20b7bc7ff2bdbbad48d076c85bf"
+"linux/amd64" = "sha256:0203fe7467454ac0607cdce709da51b7fe55f76c2b38e86c2810759079425c9f"
+"linux/arm64" = "sha256:aa61cb7921926cb176204071eddac470f198a4859aeb19c6d1249d56a4a5a738"
+"windows/amd64" = "sha256:ca49b3ce5123ce7da497ba3e573c8a33e5630d21ff7780ba3f12d77286d718c0"
 
 [[tool]]
 name = "git-cliff"
 group = "default"
-pinned = "ocx.sh/git-cliff@sha256:4bf5212fbf07f6c8f0cc70311eb079b4c4be0cda32d531eafffcd8dc3edc0ea7"
+repository = "ocx.sh/git-cliff"
+
+[tool.platforms]
+"darwin/amd64" = "sha256:12437bb39c0d538f48d3522d4b9451b17264b4964df8d83d8536a73d4cb3a81a"
+"darwin/arm64" = "sha256:dcfbc84e80d792ff7cd160700dd994ab93c389ebf42c2229dfb844aa18abc6d4"
+"linux/amd64" = "sha256:d5838c085044c0b99948efac90107be00d09dfb511bd665b835dd21f56355462"
+"linux/arm64" = "sha256:a24eed27df4426e835fb101e09a4960600f48ae54aa678e1b997df47ac99752e"
+"windows/amd64" = "sha256:65ecb7b66bf4e4fc6b0a191e040863cfdf6461cd5468a6eb52e5736afe2a0826"
+"windows/arm64" = "sha256:5fdb382fdfa0423eeff363aa994804ef2d36d4ce2019e39ce098b5e37dc24d10"
 
 [[tool]]
 name = "go-task"
 group = "default"
-pinned = "ocx.sh/go-task@sha256:fcfad89eae0672b309b5bcc7bb25e592cab244296dd9885233631b95da1ee41c"
+repository = "ocx.sh/go-task"
+
+[tool.platforms]
+"darwin/amd64" = "sha256:096c9fd1c8856a41515f5dcc3760e0ff680610aae0861b750cf217315fbe02a9"
+"darwin/arm64" = "sha256:0e0ed9cbeef63f7344e933d1e0c09af46c99abd0824bcfed877b5bd2f6091337"
+"linux/amd64" = "sha256:d3df40ad238fd278bb1529a1230ce186aedd3eb8c0e5d1c495aa9587c188adcf"
+"linux/arm64" = "sha256:78d6b8687428f5f5e2782c11295db4c813d5aab9f0cae0abc86710a2851e51f5"
+"windows/amd64" = "sha256:b3c73b637e0d1e8aaacbefb7696cd65e36016edb571b4f0e3eb919b783079ae1"
+"windows/arm64" = "sha256:d00de6d5a1ae0c8c2f3e639ef72cc5e7ee78c15dc34ee91cf77d8d84f409a365"
 
 [[tool]]
 name = "nodejs"
 group = "default"
-pinned = "ocx.sh/nodejs@sha256:5f0b5f190035ba11de413c37d7ca1ff6aef8dab20d1b4d2868ee5d68c831ca40"
+repository = "ocx.sh/nodejs"
+
+[tool.platforms]
+"darwin/amd64" = "sha256:3c0d187fe197ce6afd36e55f74b9cd518af5ab66ef3aed510973d4a23546ffd2"
+"darwin/arm64" = "sha256:aee5c3b7da9c2d7039ceb3359285df3eb5fcb8ec8dcf3e8eb5f622eda747195d"
+"linux/amd64" = "sha256:695654fabdc28b6cdb3705e12ecb989c7f964c503518968e6ee06ae208e19b2b"
+"linux/arm64" = "sha256:4e0928a97bf6a01d3fc2b0a35581601c48861349eb30cfc72955bc8deb3042a8"
+"windows/amd64" = "sha256:c05b6ef3448839f6b074a1d1b10fb0cc5d2dc81f5f38ffc466f5965b152ec2a1"
+"windows/arm64" = "sha256:92f7c3a80c1fee67f0decbeeca4bb89f93b6a2b9fd7a8132b782945732ff0319"
