@@ -11,7 +11,7 @@ import {
   resetMocks,
   tcMocks,
 } from "./setup-mocks.js";
-import { compareVersions, run } from "../src/setup.js";
+import { run } from "../src/setup.js";
 
 function makeTempDir(): string {
   const dir = path.join(
@@ -32,15 +32,23 @@ function makeCacheDir(): string {
 }
 
 let cacheDir: string;
+let originalManagedConfigEnv: string | undefined;
 
 beforeEach(() => {
   resetMocks();
   inputState.booleanInputs = { cache: true };
   cacheDir = makeCacheDir();
   tcMocks.find.mockImplementation(() => cacheDir);
+  originalManagedConfigEnv = process.env.OCX_MANAGED_CONFIG;
+  delete process.env.OCX_MANAGED_CONFIG;
 });
 
 afterEach(() => {
+  if (originalManagedConfigEnv === undefined) {
+    delete process.env.OCX_MANAGED_CONFIG;
+  } else {
+    process.env.OCX_MANAGED_CONFIG = originalManagedConfigEnv;
+  }
   mock.restore();
 });
 
@@ -209,22 +217,80 @@ describe("setup", () => {
     // overlay restore is only attempted on tool-cache miss; cache hit short-circuits.
     expect(coreMocks.setFailed).not.toHaveBeenCalled();
   });
-});
 
-describe("compareVersions", () => {
-  test("orders by numeric segments", () => {
-    expect(compareVersions("0.3.4", "0.3.5")).toBeLessThan(0);
-    expect(compareVersions("0.4.0", "0.3.5")).toBeGreaterThan(0);
-    expect(compareVersions("1.0.0", "0.9.9")).toBeGreaterThan(0);
+  test("sets managed-config-adopted to false by default", async () => {
+    inputState.inputs = { version: "latest", "github-token": "", libc: "" };
+    await run();
+    expect(coreMocks.setOutput).toHaveBeenCalledWith("managed-config-adopted", "false");
+    expect(execMocks.exec).not.toHaveBeenCalled();
   });
 
-  test("treats equal versions as 0 and ignores leading v", () => {
-    expect(compareVersions("0.3.5", "0.3.5")).toBe(0);
-    expect(compareVersions("v0.3.5", "0.3.5")).toBe(0);
+  test("adopts managed config before pulling the project (ordering)", async () => {
+    const projDir = makeTempDir();
+    fs.writeFileSync(path.join(projDir, "ocx.toml"), "[tools]\n");
+    fs.writeFileSync(path.join(projDir, "ocx.lock"), "x");
+    inputState.inputs = {
+      version: "0.4.3",
+      "github-token": "",
+      libc: "gnu",
+      project: "ocx.toml",
+      "working-directory": projDir,
+      "managed-config": "ocx.sh/acme/fleet",
+    };
+    inputState.booleanInputs = { cache: false };
+    await run();
+    expect(coreMocks.setOutput).toHaveBeenCalledWith("managed-config-adopted", "true");
+    const configSetupIndex = execMocks.exec.mock.calls.findIndex((c) =>
+      (c[1] as string[] | undefined)?.includes("config"),
+    );
+    const pullIndex = execMocks.exec.mock.calls.findIndex((c) =>
+      (c[1] as string[] | undefined)?.includes("pull"),
+    );
+    expect(configSetupIndex).toBeGreaterThanOrEqual(0);
+    expect(pullIndex).toBeGreaterThan(configSetupIndex);
   });
 
-  test("treats missing trailing segments as 0", () => {
-    expect(compareVersions("0.3", "0.3.0")).toBe(0);
-    expect(compareVersions("0.3.5", "0.3")).toBeGreaterThan(0);
+  test("adopts managed config even when project auto-load is disabled", async () => {
+    inputState.inputs = {
+      version: "0.4.3",
+      "github-token": "",
+      libc: "",
+      project: "",
+      "managed-config": "ocx.sh/acme/fleet",
+    };
+    await run();
+    expect(coreMocks.setOutput).toHaveBeenCalledWith("project-loaded", "false");
+    expect(coreMocks.setOutput).toHaveBeenCalledWith("managed-config-adopted", "true");
+    expect(execMocks.exec).toHaveBeenCalledWith(
+      expect.any(String),
+      ["config", "setup", "--managed-config", "ocx.sh/acme/fleet"],
+      expect.anything(),
+    );
+  });
+
+  test("calls setFailed when managed-config adoption fails", async () => {
+    inputState.inputs = {
+      version: "0.4.3",
+      "github-token": "",
+      libc: "",
+      "managed-config": "ocx.sh/acme/fleet",
+    };
+    execMocks.exec.mockImplementation(() => Promise.reject(new Error("exit code 80")));
+    await run();
+    expect(coreMocks.setFailed).toHaveBeenCalledWith(expect.stringContaining("exit code 80"));
+  });
+
+  test("fails managed-config adoption when resolved ocx is older than 0.4.3", async () => {
+    inputState.inputs = {
+      version: "0.4.2",
+      "github-token": "",
+      libc: "",
+      "managed-config": "ocx.sh/acme/fleet",
+    };
+    await run();
+    expect(coreMocks.setFailed).toHaveBeenCalledWith(
+      expect.stringMatching(/requires ocx >= 0\.4\.3/),
+    );
+    expect(execMocks.exec).not.toHaveBeenCalled();
   });
 });

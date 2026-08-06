@@ -1,6 +1,32 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { coreMocks, httpMocks, resetMocks } from "./setup-mocks.js";
-import { resolveVersion } from "../src/version.js";
+import { compareVersions, resolveVersion } from "../src/version.js";
+
+describe("compareVersions", () => {
+  test("orders by numeric segments", () => {
+    expect(compareVersions("0.3.4", "0.3.5")).toBeLessThan(0);
+    expect(compareVersions("0.4.0", "0.3.5")).toBeGreaterThan(0);
+    expect(compareVersions("1.0.0", "0.9.9")).toBeGreaterThan(0);
+  });
+
+  test("treats equal versions as 0 and ignores leading v", () => {
+    expect(compareVersions("0.3.5", "0.3.5")).toBe(0);
+    expect(compareVersions("v0.3.5", "0.3.5")).toBe(0);
+  });
+
+  test("treats missing trailing segments as 0", () => {
+    expect(compareVersions("0.3", "0.3.0")).toBe(0);
+    expect(compareVersions("0.3.5", "0.3")).toBeGreaterThan(0);
+  });
+
+  test("sorts a prerelease below its release (capability floors reject it)", () => {
+    expect(compareVersions("0.4.3-alpha.1", "0.4.3")).toBeLessThan(0);
+    expect(compareVersions("0.4.3-rc.1", "0.4.3")).toBeLessThan(0);
+    expect(compareVersions("0.4.3", "0.4.3-rc.1")).toBeGreaterThan(0);
+    expect(compareVersions("0.4.4-rc.1", "0.4.3")).toBeGreaterThan(0);
+    expect(compareVersions("0.4.3-rc.1", "0.4.3-rc.1")).toBe(0);
+  });
+});
 
 describe("resolveVersion", () => {
   beforeEach(() => {
