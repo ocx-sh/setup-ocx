@@ -38,16 +38,18 @@ every locked tool on `PATH` — subsequent steps can invoke `bun`, `node`,
 | `cache`             | Cache the OCX object store (`$OCX_HOME/{blobs,layers,packages,tags}`) and the ocx binary itself across runs.   | `true`                    |
 | `cache-suffix`      | Extra string appended to cache keys for manual busting.                                                        |                           |
 | `ocx-home`          | Overrides `$OCX_HOME`.                                                                                         | `~/.ocx`                  |
+| `managed-config`    | Reference to a `[managed]` config tier package (e.g. `ocx.sh/acme/fleet`) to adopt via `ocx config setup`.     |                           |
 
 ### Outputs
 
-| Output              | Description                                                           |
-| ------------------- | --------------------------------------------------------------------- |
-| `version`           | The installed OCX version                                             |
-| `ocx-path`          | Path to the OCX binary directory                                      |
-| `cache-hit`         | Whether the OCX binary was restored from cache                        |
-| `project-loaded`    | Whether an OCX project was found and activated (`"true"` / `"false"`) |
-| `project-cache-hit` | Whether the OCX object store was restored from cache for this project |
+| Output                   | Description                                                                         |
+| ------------------------ | ----------------------------------------------------------------------------------- |
+| `version`                | The installed OCX version                                                           |
+| `ocx-path`               | Path to the OCX binary directory                                                    |
+| `cache-hit`              | Whether the OCX binary was restored from cache                                      |
+| `project-loaded`         | Whether an OCX project was found and activated (`"true"` / `"false"`)               |
+| `project-cache-hit`      | Whether the OCX object store was restored from cache for this project               |
+| `managed-config-adopted` | Whether the `[managed]` config tier was adopted or refreshed (`"true"` / `"false"`) |
 
 ### Examples
 
@@ -95,6 +97,40 @@ steps:
     with:
       libc: musl
 ```
+
+### Managed config
+
+Set `managed-config` to adopt (or refresh) a `[managed]` corporate config tier
+package before anything else runs:
+
+```yaml
+steps:
+  - uses: ocx-sh/setup-ocx@v1
+    with:
+      managed-config: ocx.sh/acme/fleet
+```
+
+This runs `ocx config setup --managed-config <ref>`, exactly once per job,
+**before** project activation — mirrors/registries a `[managed]` tier
+configures apply to every ocx invocation the action makes afterwards
+(`ocx pull`, `ocx env`, etc.), independent of `project` mode, so it also runs
+when `project: ""` disables project auto-load.
+
+Leave `managed-config` unset and the action instead honors an ambient
+`OCX_MANAGED_CONFIG` env var — set it on the job/workflow and the action runs
+a bare `ocx config setup` (no explicit `--managed-config` flag; ocx resolves
+the ref from its own flag > env > seed precedence). Both empty is a no-op —
+nothing runs and `managed-config-adopted` is `"false"`.
+
+Requires ocx **0.4.3** or newer (`ocx config setup`); the action fails the
+step with a clear error if a pinned `version` is older. A failed adoption is
+a hard failure — the step fails and stops, matching the rest of the action's
+error posture (no silent fallback to an unconfigured registry).
+
+> **Cache note:** `state/managed-config/` and `$OCX_HOME/config.toml` are not
+> part of the object store cache (`cache: true` only caches
+> `{blobs,layers,packages,tags}`), so adoption fetches fresh from the
+> registry on every run — there is no stale-snapshot risk from caching.
 
 ### Caching
 

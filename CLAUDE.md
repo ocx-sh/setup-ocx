@@ -36,11 +36,12 @@ Source modules in `src/` are bundled into two artifacts by `esbuild`: `dist/setu
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `setup.ts`           | Main entry — reads inputs, orchestrates resolve → download → cache → project activation                                                                        |
 | `save-cache.ts`      | Post entry — saves binary + object-store caches deferred by the main step                                                                                      |
-| `version.ts`         | Resolves `"latest"` to a concrete version via the GitHub Releases API (with retry)                                                                             |
+| `version.ts`         | Resolves `"latest"` to a concrete version via the GitHub Releases API (with retry) + `compareVersions()` semver floor comparison                               |
 | `constants.ts`       | Maps Node.js `platform`/`arch` to Rust target triples; detects musl vs gnu libc                                                                                |
 | `download.ts`        | Downloads archive, verifies SHA256, extracts, caches binary (overlays `@actions/cache` over `RUNNER_TOOL_CACHE`)                                               |
 | `cache.ts`           | `$OCX_HOME` object store cache (selective dirs, lockfile-hash key)                                                                                             |
 | `project.ts`         | Discovers `ocx.toml`, runs `ocx pull`, then `ocx env --ci=github` (ocx writes `$GITHUB_PATH`/`$GITHUB_ENV`)                                                    |
+| `managed-config.ts`  | Adopts/refreshes the `[managed]` config tier via `ocx config setup`, run before project activation                                                             |
 | `http-retry.ts`      | Generic `withRetry()` helper — exponential backoff + Retry-After support                                                                                       |
 | `win-title-guard.ts` | Side-effect import (first in each entry) — sets `process.title` to preempt the libuv `process_title` abort on Windows before any `@actions/*` module evaluates |
 
