@@ -30,10 +30,13 @@ jobs:
           VERSION: ${{ steps.setup.outputs.version }}
           OCX_PATH: ${{ steps.setup.outputs.ocx-path }}
           PROJECT_LOADED: ${{ steps.setup.outputs.project-loaded }}
+          MANAGED_CONFIG_ADOPTED: ${{ steps.setup.outputs.managed-config-adopted }}
         run: |
           test -n "$VERSION"
           test -n "$OCX_PATH"
           test "$PROJECT_LOADED" = "true"
+          # No managed-config input and no OCX_MANAGED_CONFIG env: adoption must not run.
+          test "$MANAGED_CONFIG_ADOPTED" = "false"
 
   project-disabled:
     name: Project disabled (binary-only)
