@@ -18743,7 +18743,7 @@ var require_file_command = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.prepareKeyValueMessage = exports2.issueFileCommand = void 0;
     var crypto6 = __importStar(require("crypto"));
-    var fs10 = __importStar(require("fs"));
+    var fs11 = __importStar(require("fs"));
     var os9 = __importStar(require("os"));
     var utils_1 = require_utils2();
     function issueFileCommand2(command, message) {
@@ -18751,10 +18751,10 @@ var require_file_command = __commonJS({
       if (!filePath) {
         throw new Error(`Unable to find environment variable for file command ${command}`);
       }
-      if (!fs10.existsSync(filePath)) {
+      if (!fs11.existsSync(filePath)) {
         throw new Error(`Missing file at path: ${filePath}`);
       }
-      fs10.appendFileSync(filePath, `${(0, utils_1.toCommandValue)(message)}${os9.EOL}`, {
+      fs11.appendFileSync(filePath, `${(0, utils_1.toCommandValue)(message)}${os9.EOL}`, {
         encoding: "utf8"
       });
     }
@@ -36834,12 +36834,12 @@ var require_io_util = __commonJS({
     var _a;
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.getCmdPath = exports2.tryGetExecutablePath = exports2.isRooted = exports2.isDirectory = exports2.exists = exports2.READONLY = exports2.UV_FS_O_EXLOCK = exports2.IS_WINDOWS = exports2.unlink = exports2.symlink = exports2.stat = exports2.rmdir = exports2.rm = exports2.rename = exports2.readlink = exports2.readdir = exports2.open = exports2.mkdir = exports2.lstat = exports2.copyFile = exports2.chmod = void 0;
-    var fs10 = __importStar(require("fs"));
+    var fs11 = __importStar(require("fs"));
     var path10 = __importStar(require("path"));
-    _a = fs10.promises, exports2.chmod = _a.chmod, exports2.copyFile = _a.copyFile, exports2.lstat = _a.lstat, exports2.mkdir = _a.mkdir, exports2.open = _a.open, exports2.readdir = _a.readdir, exports2.readlink = _a.readlink, exports2.rename = _a.rename, exports2.rm = _a.rm, exports2.rmdir = _a.rmdir, exports2.stat = _a.stat, exports2.symlink = _a.symlink, exports2.unlink = _a.unlink;
+    _a = fs11.promises, exports2.chmod = _a.chmod, exports2.copyFile = _a.copyFile, exports2.lstat = _a.lstat, exports2.mkdir = _a.mkdir, exports2.open = _a.open, exports2.readdir = _a.readdir, exports2.readlink = _a.readlink, exports2.rename = _a.rename, exports2.rm = _a.rm, exports2.rmdir = _a.rmdir, exports2.stat = _a.stat, exports2.symlink = _a.symlink, exports2.unlink = _a.unlink;
     exports2.IS_WINDOWS = process.platform === "win32";
     exports2.UV_FS_O_EXLOCK = 268435456;
-    exports2.READONLY = fs10.constants.O_RDONLY;
+    exports2.READONLY = fs11.constants.O_RDONLY;
     function exists3(fsPath) {
       return __awaiter10(this, void 0, void 0, function* () {
         try {
@@ -37740,7 +37740,7 @@ var require_exec = __commonJS({
     exports2.getExecOutput = exports2.exec = void 0;
     var string_decoder_1 = require("string_decoder");
     var tr = __importStar(require_toolrunner());
-    function exec4(commandLine, args, options) {
+    function exec6(commandLine, args, options) {
       return __awaiter10(this, void 0, void 0, function* () {
         const commandArgs = tr.argStringToArray(commandLine);
         if (commandArgs.length === 0) {
@@ -37752,7 +37752,7 @@ var require_exec = __commonJS({
         return runner.exec();
       });
     }
-    exports2.exec = exec4;
+    exports2.exec = exec6;
     function getExecOutput2(commandLine, args, options) {
       var _a, _b;
       return __awaiter10(this, void 0, void 0, function* () {
@@ -37775,7 +37775,7 @@ var require_exec = __commonJS({
           }
         };
         const listeners = Object.assign(Object.assign({}, options === null || options === void 0 ? void 0 : options.listeners), { stdout: stdOutListener, stderr: stdErrListener });
-        const exitCode = yield exec4(commandLine, args, Object.assign(Object.assign({}, options), { listeners }));
+        const exitCode = yield exec6(commandLine, args, Object.assign(Object.assign({}, options), { listeners }));
         stdout += stdoutDecoder.end();
         stderr += stderrDecoder.end();
         return {
@@ -37853,12 +37853,12 @@ var require_platform = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.getDetails = exports2.isLinux = exports2.isMacOS = exports2.isWindows = exports2.arch = exports2.platform = void 0;
     var os_1 = __importDefault(require("os"));
-    var exec4 = __importStar(require_exec());
+    var exec6 = __importStar(require_exec());
     var getWindowsInfo = () => __awaiter10(void 0, void 0, void 0, function* () {
-      const { stdout: version2 } = yield exec4.getExecOutput('powershell -command "(Get-CimInstance -ClassName Win32_OperatingSystem).Version"', void 0, {
+      const { stdout: version2 } = yield exec6.getExecOutput('powershell -command "(Get-CimInstance -ClassName Win32_OperatingSystem).Version"', void 0, {
         silent: true
       });
-      const { stdout: name } = yield exec4.getExecOutput('powershell -command "(Get-CimInstance -ClassName Win32_OperatingSystem).Caption"', void 0, {
+      const { stdout: name } = yield exec6.getExecOutput('powershell -command "(Get-CimInstance -ClassName Win32_OperatingSystem).Caption"', void 0, {
         silent: true
       });
       return {
@@ -37868,7 +37868,7 @@ var require_platform = __commonJS({
     });
     var getMacOsInfo = () => __awaiter10(void 0, void 0, void 0, function* () {
       var _a, _b, _c, _d;
-      const { stdout } = yield exec4.getExecOutput("sw_vers", void 0, {
+      const { stdout } = yield exec6.getExecOutput("sw_vers", void 0, {
         silent: true
       });
       const version2 = (_b = (_a = stdout.match(/ProductVersion:\s*(.+)/)) === null || _a === void 0 ? void 0 : _a[1]) !== null && _b !== void 0 ? _b : "";
@@ -37879,7 +37879,7 @@ var require_platform = __commonJS({
       };
     });
     var getLinuxInfo = () => __awaiter10(void 0, void 0, void 0, function* () {
-      const { stdout } = yield exec4.getExecOutput("lsb_release", ["-i", "-r", "-s"], {
+      const { stdout } = yield exec6.getExecOutput("lsb_release", ["-i", "-r", "-s"], {
         silent: true
       });
       const [name, version2] = stdout.trim().split("\n");
@@ -38289,7 +38289,7 @@ var require_file_command2 = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.prepareKeyValueMessage = exports2.issueFileCommand = void 0;
     var crypto6 = __importStar(require("crypto"));
-    var fs10 = __importStar(require("fs"));
+    var fs11 = __importStar(require("fs"));
     var os9 = __importStar(require("os"));
     var utils_1 = require_utils4();
     function issueFileCommand2(command, message) {
@@ -38297,10 +38297,10 @@ var require_file_command2 = __commonJS({
       if (!filePath) {
         throw new Error(`Unable to find environment variable for file command ${command}`);
       }
-      if (!fs10.existsSync(filePath)) {
+      if (!fs11.existsSync(filePath)) {
         throw new Error(`Missing file at path: ${filePath}`);
       }
-      fs10.appendFileSync(filePath, `${(0, utils_1.toCommandValue)(message)}${os9.EOL}`, {
+      fs11.appendFileSync(filePath, `${(0, utils_1.toCommandValue)(message)}${os9.EOL}`, {
         encoding: "utf8"
       });
     }
@@ -54396,12 +54396,12 @@ var require_platform2 = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.getDetails = exports2.isLinux = exports2.isMacOS = exports2.isWindows = exports2.arch = exports2.platform = void 0;
     var os_1 = __importDefault(require("os"));
-    var exec4 = __importStar(require_exec());
+    var exec6 = __importStar(require_exec());
     var getWindowsInfo = () => __awaiter10(void 0, void 0, void 0, function* () {
-      const { stdout: version2 } = yield exec4.getExecOutput('powershell -command "(Get-CimInstance -ClassName Win32_OperatingSystem).Version"', void 0, {
+      const { stdout: version2 } = yield exec6.getExecOutput('powershell -command "(Get-CimInstance -ClassName Win32_OperatingSystem).Version"', void 0, {
         silent: true
       });
-      const { stdout: name } = yield exec4.getExecOutput('powershell -command "(Get-CimInstance -ClassName Win32_OperatingSystem).Caption"', void 0, {
+      const { stdout: name } = yield exec6.getExecOutput('powershell -command "(Get-CimInstance -ClassName Win32_OperatingSystem).Caption"', void 0, {
         silent: true
       });
       return {
@@ -54411,7 +54411,7 @@ var require_platform2 = __commonJS({
     });
     var getMacOsInfo = () => __awaiter10(void 0, void 0, void 0, function* () {
       var _a, _b, _c, _d;
-      const { stdout } = yield exec4.getExecOutput("sw_vers", void 0, {
+      const { stdout } = yield exec6.getExecOutput("sw_vers", void 0, {
         silent: true
       });
       const version2 = (_b = (_a = stdout.match(/ProductVersion:\s*(.+)/)) === null || _a === void 0 ? void 0 : _a[1]) !== null && _b !== void 0 ? _b : "";
@@ -54422,7 +54422,7 @@ var require_platform2 = __commonJS({
       };
     });
     var getLinuxInfo = () => __awaiter10(void 0, void 0, void 0, function* () {
-      const { stdout } = yield exec4.getExecOutput("lsb_release", ["-i", "-r", "-s"], {
+      const { stdout } = yield exec6.getExecOutput("lsb_release", ["-i", "-r", "-s"], {
         silent: true
       });
       const [name, version2] = stdout.trim().split("\n");
@@ -56286,7 +56286,7 @@ var require_internal_globber = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.DefaultGlobber = void 0;
     var core = __importStar(require_core2());
-    var fs10 = __importStar(require("fs"));
+    var fs11 = __importStar(require("fs"));
     var globOptionsHelper = __importStar(require_internal_glob_options_helper());
     var path10 = __importStar(require("path"));
     var patternHelper = __importStar(require_internal_pattern_helper());
@@ -56338,7 +56338,7 @@ var require_internal_globber = __commonJS({
           for (const searchPath of patternHelper.getSearchPaths(patterns)) {
             core.debug(`Search path '${searchPath}'`);
             try {
-              yield __await(fs10.promises.lstat(searchPath));
+              yield __await(fs11.promises.lstat(searchPath));
             } catch (err) {
               if (err.code === "ENOENT") {
                 continue;
@@ -56369,7 +56369,7 @@ var require_internal_globber = __commonJS({
                 continue;
               }
               const childLevel = item.level + 1;
-              const childItems = (yield __await(fs10.promises.readdir(item.path))).map((x) => new internal_search_state_1.SearchState(path10.join(item.path, x), childLevel));
+              const childItems = (yield __await(fs11.promises.readdir(item.path))).map((x) => new internal_search_state_1.SearchState(path10.join(item.path, x), childLevel));
               stack.push(...childItems.reverse());
             } else if (match & internal_match_kind_1.MatchKind.File) {
               yield yield __await(item.path);
@@ -56404,7 +56404,7 @@ var require_internal_globber = __commonJS({
           let stats;
           if (options.followSymbolicLinks) {
             try {
-              stats = yield fs10.promises.stat(item.path);
+              stats = yield fs11.promises.stat(item.path);
             } catch (err) {
               if (err.code === "ENOENT") {
                 if (options.omitBrokenSymbolicLinks) {
@@ -56416,10 +56416,10 @@ var require_internal_globber = __commonJS({
               throw err;
             }
           } else {
-            stats = yield fs10.promises.lstat(item.path);
+            stats = yield fs11.promises.lstat(item.path);
           }
           if (stats.isDirectory() && options.followSymbolicLinks) {
-            const realPath = yield fs10.promises.realpath(item.path);
+            const realPath = yield fs11.promises.realpath(item.path);
             while (traversalChain.length >= item.level) {
               traversalChain.pop();
             }
@@ -57749,11 +57749,11 @@ var require_cacheUtils = __commonJS({
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.getRuntimeToken = exports2.getCacheVersion = exports2.assertDefined = exports2.getGnuTarPathOnWindows = exports2.getCacheFileName = exports2.getCompressionMethod = exports2.unlinkFile = exports2.resolvePaths = exports2.getArchiveFileSizeInBytes = exports2.createTempDirectory = void 0;
     var core = __importStar(require_core());
-    var exec4 = __importStar(require_exec());
+    var exec6 = __importStar(require_exec());
     var glob = __importStar(require_glob());
     var io = __importStar(require_io());
     var crypto6 = __importStar(require("crypto"));
-    var fs10 = __importStar(require("fs"));
+    var fs11 = __importStar(require("fs"));
     var path10 = __importStar(require("path"));
     var semver3 = __importStar(require_semver());
     var util4 = __importStar(require("util"));
@@ -57783,7 +57783,7 @@ var require_cacheUtils = __commonJS({
     }
     exports2.createTempDirectory = createTempDirectory;
     function getArchiveFileSizeInBytes(filePath) {
-      return fs10.statSync(filePath).size;
+      return fs11.statSync(filePath).size;
     }
     exports2.getArchiveFileSizeInBytes = getArchiveFileSizeInBytes;
     function resolvePaths(patterns) {
@@ -57823,7 +57823,7 @@ var require_cacheUtils = __commonJS({
     exports2.resolvePaths = resolvePaths;
     function unlinkFile(filePath) {
       return __awaiter10(this, void 0, void 0, function* () {
-        return util4.promisify(fs10.unlink)(filePath);
+        return util4.promisify(fs11.unlink)(filePath);
       });
     }
     exports2.unlinkFile = unlinkFile;
@@ -57833,7 +57833,7 @@ var require_cacheUtils = __commonJS({
         additionalArgs.push("--version");
         core.debug(`Checking ${app} ${additionalArgs.join(" ")}`);
         try {
-          yield exec4.exec(`${app}`, additionalArgs, {
+          yield exec6.exec(`${app}`, additionalArgs, {
             ignoreReturnCode: true,
             silent: true,
             listeners: {
@@ -57868,7 +57868,7 @@ var require_cacheUtils = __commonJS({
     exports2.getCacheFileName = getCacheFileName;
     function getGnuTarPathOnWindows() {
       return __awaiter10(this, void 0, void 0, function* () {
-        if (fs10.existsSync(constants_1.GnuTarPathOnWindows)) {
+        if (fs11.existsSync(constants_1.GnuTarPathOnWindows)) {
           return constants_1.GnuTarPathOnWindows;
         }
         const versionOutput = yield getVersion("tar");
@@ -96759,7 +96759,7 @@ var require_downloadUtils = __commonJS({
     var http_client_1 = require_lib();
     var storage_blob_1 = (init_esm15(), __toCommonJS(esm_exports3));
     var buffer2 = __importStar(require("buffer"));
-    var fs10 = __importStar(require("fs"));
+    var fs11 = __importStar(require("fs"));
     var stream2 = __importStar(require("stream"));
     var util4 = __importStar(require("util"));
     var utils = __importStar(require_cacheUtils());
@@ -96870,7 +96870,7 @@ var require_downloadUtils = __commonJS({
     exports2.DownloadProgress = DownloadProgress;
     function downloadCacheHttpClient(archiveLocation, archivePath) {
       return __awaiter10(this, void 0, void 0, function* () {
-        const writeStream = fs10.createWriteStream(archivePath);
+        const writeStream = fs11.createWriteStream(archivePath);
         const httpClient = new http_client_1.HttpClient("actions/cache");
         const downloadResponse = yield (0, requestUtils_1.retryHttpClientResponse)("downloadCache", () => __awaiter10(this, void 0, void 0, function* () {
           return httpClient.get(archiveLocation);
@@ -96896,7 +96896,7 @@ var require_downloadUtils = __commonJS({
     function downloadCacheHttpClientConcurrent(archiveLocation, archivePath, options) {
       var _a;
       return __awaiter10(this, void 0, void 0, function* () {
-        const archiveDescriptor = yield fs10.promises.open(archivePath, "w");
+        const archiveDescriptor = yield fs11.promises.open(archivePath, "w");
         const httpClient = new http_client_1.HttpClient("actions/cache", void 0, {
           socketTimeout: options.timeoutInMs,
           keepAlive: true
@@ -97013,7 +97013,7 @@ var require_downloadUtils = __commonJS({
         } else {
           const maxSegmentSize = Math.min(134217728, buffer2.constants.MAX_LENGTH);
           const downloadProgress = new DownloadProgress(contentLength2);
-          const fd = fs10.openSync(archivePath, "w");
+          const fd = fs11.openSync(archivePath, "w");
           try {
             downloadProgress.startDisplayTimer();
             const controller = new abort_controller_1.AbortController();
@@ -97031,12 +97031,12 @@ var require_downloadUtils = __commonJS({
                 controller.abort();
                 throw new Error("Aborting cache download as the download time exceeded the timeout.");
               } else if (Buffer.isBuffer(result)) {
-                fs10.writeFileSync(fd, result);
+                fs11.writeFileSync(fd, result);
               }
             }
           } finally {
             downloadProgress.stopDisplayTimer();
-            fs10.closeSync(fd);
+            fs11.closeSync(fd);
           }
         }
       });
@@ -97335,7 +97335,7 @@ var require_cacheHttpClient = __commonJS({
     var core = __importStar(require_core());
     var http_client_1 = require_lib();
     var auth_1 = require_auth();
-    var fs10 = __importStar(require("fs"));
+    var fs11 = __importStar(require("fs"));
     var url_1 = require("url");
     var utils = __importStar(require_cacheUtils());
     var uploadUtils_1 = require_uploadUtils();
@@ -97473,7 +97473,7 @@ Other caches with similar key:`);
       return __awaiter10(this, void 0, void 0, function* () {
         const fileSize = utils.getArchiveFileSizeInBytes(archivePath);
         const resourceUrl = getCacheApiUrl(`caches/${cacheId.toString()}`);
-        const fd = fs10.openSync(archivePath, "r");
+        const fd = fs11.openSync(archivePath, "r");
         const uploadOptions = (0, options_1.getUploadOptions)(options);
         const concurrency = utils.assertDefined("uploadConcurrency", uploadOptions.uploadConcurrency);
         const maxChunkSize = utils.assertDefined("uploadChunkSize", uploadOptions.uploadChunkSize);
@@ -97487,7 +97487,7 @@ Other caches with similar key:`);
               const start = offset;
               const end = offset + chunkSize - 1;
               offset += maxChunkSize;
-              yield uploadChunk(httpClient, resourceUrl, () => fs10.createReadStream(archivePath, {
+              yield uploadChunk(httpClient, resourceUrl, () => fs11.createReadStream(archivePath, {
                 fd,
                 start,
                 end,
@@ -97498,7 +97498,7 @@ Other caches with similar key:`);
             }
           })));
         } finally {
-          fs10.closeSync(fd);
+          fs11.closeSync(fd);
         }
         return;
       });
@@ -105283,7 +105283,6 @@ var require_semver3 = __commonJS({
 // src/setup.ts
 var setup_exports = {};
 __export(setup_exports, {
-  compareVersions: () => compareVersions,
   run: () => run
 });
 module.exports = __toCommonJS(setup_exports);
@@ -107989,6 +107988,10 @@ function findBinDir(dir) {
   return dir;
 }
 
+// src/managed-config.ts
+var exec4 = __toESM(require_exec(), 1);
+var fs10 = __toESM(require("node:fs"), 1);
+
 // src/project.ts
 var exec2 = __toESM(require_exec(), 1);
 var fs9 = __toESM(require("node:fs"), 1);
@@ -108053,12 +108056,19 @@ async function restoreObjectStoreCache(cfg) {
 }
 
 // src/project.ts
+function resolveWorkingDirectory() {
+  return getInput("working-directory") || (process.env.GITHUB_WORKSPACE ?? process.cwd());
+}
+function resolveOcxHome() {
+  const ocxHomeInput = getInput("ocx-home");
+  return ocxHomeInput ? path8.resolve(ocxHomeInput) : path8.join(os8.homedir(), ".ocx");
+}
 function readProjectInputs() {
   const rawProject = getInput("project");
   if (!rawProject) {
     return null;
   }
-  const workingDirectory = getInput("working-directory") || (process.env.GITHUB_WORKSPACE ?? process.cwd());
+  const workingDirectory = resolveWorkingDirectory();
   const projectFile = path8.isAbsolute(rawProject) ? rawProject : path8.join(workingDirectory, rawProject);
   if (!fs9.existsSync(projectFile)) {
     info(`No project at ${projectFile} \u2014 skipping project activation.`);
@@ -108073,14 +108083,12 @@ function readProjectInputs() {
   const groups = getInput("groups").split(",").map((g) => g.trim()).filter(Boolean);
   const cacheEnabled = getBooleanInput("cache");
   const cacheSuffix = getInput("cache-suffix");
-  const ocxHomeInput = getInput("ocx-home");
-  const ocxHome = ocxHomeInput ? path8.resolve(ocxHomeInput) : path8.join(os8.homedir(), ".ocx");
   return {
+    ocxHome: resolveOcxHome(),
     workingDirectory,
     projectFile,
     lockFile,
     groups,
-    ocxHome,
     cacheEnabled,
     cacheSuffix
   };
@@ -108176,6 +108184,26 @@ function parseRetryAfterMs(value) {
 }
 
 // src/version.ts
+function compareVersions(a, b) {
+  const parse2 = (v) => {
+    const [core = "", ...pre] = v.replace(/^v/, "").split("-");
+    return {
+      nums: core.split(".").map((s) => Number.parseInt(s, 10) || 0),
+      pre: pre.join("-")
+    };
+  };
+  const pa = parse2(a);
+  const pb = parse2(b);
+  const len = Math.max(pa.nums.length, pb.nums.length);
+  for (let i = 0; i < len; i++) {
+    const diff = (pa.nums[i] ?? 0) - (pb.nums[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  if (!pa.pre && !pb.pre) return 0;
+  if (!pa.pre) return 1;
+  if (!pb.pre) return -1;
+  return pa.pre < pb.pre ? -1 : pa.pre > pb.pre ? 1 : 0;
+}
 async function resolveVersion(version2, token) {
   if (version2 !== "latest") {
     return version2.replace(/^v/, "");
@@ -108228,19 +108256,35 @@ async function resolveVersion(version2, token) {
   return resolved;
 }
 
+// src/managed-config.ts
+var MIN_MANAGED_CONFIG_OCX_VERSION = "0.4.3";
+async function adoptManagedConfig(ocxBin, ocxVersion) {
+  const managedConfigInput = getInput("managed-config");
+  const managedConfigEnv = process.env.OCX_MANAGED_CONFIG ?? "";
+  if (!managedConfigInput && !managedConfigEnv) {
+    return false;
+  }
+  if (compareVersions(ocxVersion, MIN_MANAGED_CONFIG_OCX_VERSION) < 0) {
+    throw new Error(
+      `managed-config requires ocx >= ${MIN_MANAGED_CONFIG_OCX_VERSION} (config setup). Resolved ${ocxVersion} is too old \u2014 upgrade the version input or unset managed-config.`
+    );
+  }
+  const workingDirectory = resolveWorkingDirectory();
+  const ocxHome = resolveOcxHome();
+  exportVariable("OCX_HOME", ocxHome);
+  fs10.mkdirSync(ocxHome, { recursive: true });
+  const args = ["config", "setup"];
+  if (managedConfigInput) {
+    args.push("--managed-config", managedConfigInput);
+  }
+  await group("ocx config setup", async () => {
+    await exec4.exec(ocxBin, args, { cwd: workingDirectory });
+  });
+  return true;
+}
+
 // src/setup.ts
 var MIN_PROJECT_OCX_VERSION = "0.3.5";
-function compareVersions(a, b) {
-  const parse2 = (v) => v.replace(/^v/, "").split(".").map((s) => Number.parseInt(s, 10) || 0);
-  const pa = parse2(a);
-  const pb = parse2(b);
-  const len = Math.max(pa.length, pb.length);
-  for (let i = 0; i < len; i++) {
-    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
-    if (diff !== 0) return diff;
-  }
-  return 0;
-}
 async function run() {
   try {
     const versionInput = getInput("version");
@@ -108271,6 +108315,9 @@ async function run() {
     setOutput("version", installedVersion);
     setOutput("ocx-path", binDir);
     setOutput("cache-hit", cacheHit.toString());
+    const ocxBin = path9.join(binDir, process.platform === "win32" ? "ocx.exe" : "ocx");
+    const managedConfigAdopted = await adoptManagedConfig(ocxBin, installedVersion);
+    setOutput("managed-config-adopted", managedConfigAdopted ? "true" : "false");
     const projectInputs = readProjectInputs();
     let projectLoaded = false;
     let projectCacheHit = false;
@@ -108280,7 +108327,6 @@ async function run() {
           `Project activation requires ocx >= ${MIN_PROJECT_OCX_VERSION} (env --ci). Resolved ${installedVersion} is too old \u2014 upgrade the version input or set project: ''.`
         );
       }
-      const ocxBin = path9.join(binDir, process.platform === "win32" ? "ocx.exe" : "ocx");
       const result = await loadProject({
         ocxBin,
         ocxVersion: installedVersion,
@@ -108320,7 +108366,6 @@ async function run() {
 void run();
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  compareVersions,
   run
 });
 /*! Bundled license information:

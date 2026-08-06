@@ -6,32 +6,12 @@ import * as path from "node:path";
 import { detectLibc } from "./constants.js";
 import type { Libc } from "./constants.js";
 import { downloadOcx } from "./download.js";
+import { adoptManagedConfig } from "./managed-config.js";
 import { loadProject, readProjectInputs } from "./project.js";
-import { resolveVersion } from "./version.js";
+import { compareVersions, resolveVersion } from "./version.js";
 
 /** Minimum ocx version that supports `ocx env --ci=github` (project activation). */
 const MIN_PROJECT_OCX_VERSION = "0.3.5";
-
-/**
- * Compare two dotted numeric versions (optional leading `v`).
- * Returns <0 if a<b, 0 if equal, >0 if a>b. Non-numeric / missing segments
- * are treated as 0, so pre-release suffixes are ignored for the floor check.
- */
-export function compareVersions(a: string, b: string): number {
-  const parse = (v: string): number[] =>
-    v
-      .replace(/^v/, "")
-      .split(".")
-      .map((s) => Number.parseInt(s, 10) || 0);
-  const pa = parse(a);
-  const pb = parse(b);
-  const len = Math.max(pa.length, pb.length);
-  for (let i = 0; i < len; i++) {
-    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
-    if (diff !== 0) return diff;
-  }
-  return 0;
-}
 
 export async function run(): Promise<void> {
   try {
@@ -73,6 +53,15 @@ export async function run(): Promise<void> {
     core.setOutput("ocx-path", binDir);
     core.setOutput("cache-hit", cacheHit.toString());
 
+    const ocxBin = path.join(binDir, process.platform === "win32" ? "ocx.exe" : "ocx");
+
+    // Phase 1.5: managed-config adoption. Must run before
+    // readProjectInputs()/loadProject() below — managed config governs
+    // mirrors/registries for every ocx invocation, so it applies independent
+    // of project mode (including project: '').
+    const managedConfigAdopted = await adoptManagedConfig(ocxBin, installedVersion);
+    core.setOutput("managed-config-adopted", managedConfigAdopted ? "true" : "false");
+
     // Phase 2: project activation (auto-loads when ocx.toml exists).
     const projectInputs = readProjectInputs();
     let projectLoaded = false;
@@ -85,7 +74,6 @@ export async function run(): Promise<void> {
             `Resolved ${installedVersion} is too old — upgrade the version input or set project: ''.`,
         );
       }
-      const ocxBin = path.join(binDir, process.platform === "win32" ? "ocx.exe" : "ocx");
       const result = await loadProject({
         ocxBin,
         ocxVersion: installedVersion,

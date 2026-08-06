@@ -29,6 +29,23 @@ export interface LoadProjectResult {
 }
 
 /**
+ * Directory every `ocx` invocation runs in. Shared by project activation and
+ * managed-config adoption — both must resolve it identically.
+ */
+export function resolveWorkingDirectory(): string {
+  return core.getInput("working-directory") || (process.env.GITHUB_WORKSPACE ?? process.cwd());
+}
+
+/**
+ * Absolute `$OCX_HOME`. Shared by project activation and managed-config
+ * adoption — a divergence would export one home and pull into another.
+ */
+export function resolveOcxHome(): string {
+  const ocxHomeInput = core.getInput("ocx-home");
+  return ocxHomeInput ? path.resolve(ocxHomeInput) : path.join(os.homedir(), ".ocx");
+}
+
+/**
  * Parse action inputs into a normalized project configuration.
  *
  * Returns null when the project file does not exist — the action then
@@ -41,8 +58,7 @@ export function readProjectInputs(): ProjectInputs | null {
     return null;
   }
 
-  const workingDirectory =
-    core.getInput("working-directory") || (process.env.GITHUB_WORKSPACE ?? process.cwd());
+  const workingDirectory = resolveWorkingDirectory();
 
   const projectFile = path.isAbsolute(rawProject)
     ? rawProject
@@ -69,15 +85,12 @@ export function readProjectInputs(): ProjectInputs | null {
   const cacheEnabled = core.getBooleanInput("cache");
   const cacheSuffix = core.getInput("cache-suffix");
 
-  const ocxHomeInput = core.getInput("ocx-home");
-  const ocxHome = ocxHomeInput ? path.resolve(ocxHomeInput) : path.join(os.homedir(), ".ocx");
-
   return {
+    ocxHome: resolveOcxHome(),
     workingDirectory,
     projectFile,
     lockFile,
     groups,
-    ocxHome,
     cacheEnabled,
     cacheSuffix,
   };

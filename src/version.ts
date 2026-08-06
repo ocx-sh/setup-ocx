@@ -8,6 +8,34 @@ interface GitHubRelease {
   tag_name: string;
 }
 
+/**
+ * Compare two dotted numeric versions (optional leading `v`).
+ * Returns <0 if a<b, 0 if equal, >0 if a>b. Missing numeric segments are
+ * treated as 0. A prerelease suffix (`0.4.3-rc.1`) sorts below its release
+ * (SemVer rule) so capability floors reject prerelease builds of the floor
+ * version; two prereleases of the same version compare textually.
+ */
+export function compareVersions(a: string, b: string): number {
+  const parse = (v: string): { nums: number[]; pre: string } => {
+    const [core = "", ...pre] = v.replace(/^v/, "").split("-");
+    return {
+      nums: core.split(".").map((s) => Number.parseInt(s, 10) || 0),
+      pre: pre.join("-"),
+    };
+  };
+  const pa = parse(a);
+  const pb = parse(b);
+  const len = Math.max(pa.nums.length, pb.nums.length);
+  for (let i = 0; i < len; i++) {
+    const diff = (pa.nums[i] ?? 0) - (pb.nums[i] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  if (!pa.pre && !pb.pre) return 0;
+  if (!pa.pre) return 1;
+  if (!pb.pre) return -1;
+  return pa.pre < pb.pre ? -1 : pa.pre > pb.pre ? 1 : 0;
+}
+
 export async function resolveVersion(version: string, token: string): Promise<string> {
   if (version !== "latest") {
     return version.replace(/^v/, "");
