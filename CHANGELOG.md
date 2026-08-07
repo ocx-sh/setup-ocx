@@ -2,11 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0](https://github.com/ocx-sh/setup-ocx/releases/tag/v1.4.0) — 2026-08-07
+
+### Added
+
+- Adopt/refresh the [managed] config tier via ocx config setup by @michael-herwig ([2a7cdc6](https://github.com/ocx-sh/setup-ocx/commit/2a7cdc67d456768c8ef181e97445b0e9dfbc2e7a))
+
+### Documentation
+
+- Document the managed-config input and adoption behavior by @michael-herwig ([10ba6d8](https://github.com/ocx-sh/setup-ocx/commit/10ba6d836b1dd8d462848a38878714d382e57d8b))
 ## [1.3.0](https://github.com/ocx-sh/setup-ocx/releases/tag/v1.3.0) — 2026-07-11
 
 ### Added
 
-- Support tar.gz archives with tar.xz fallback ([ae06166](https://github.com/ocx-sh/setup-ocx/commit/ae06166db67732f6633e63b28dd96d26a82def10))
+- Support tar.gz archives with tar.xz fallback by @michael-herwig ([ae06166](https://github.com/ocx-sh/setup-ocx/commit/ae06166db67732f6633e63b28dd96d26a82def10))
+
+### Release
+
+- V1.3.0 by @michael-herwig ([dbb4743](https://github.com/ocx-sh/setup-ocx/commit/dbb4743307c8c867e5e34d9a8658f08dfdeb962b))
 ## [1.2.2](https://github.com/ocx-sh/setup-ocx/releases/tag/v1.2.2) — 2026-06-04
 
 ### Fixed
