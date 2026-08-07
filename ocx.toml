@@ -1,7 +1,7 @@
 [tools]
-bun = "ocx.sh/bun:1"
-nodejs = "ocx.sh/nodejs:24"
-go-task = "ocx.sh/go-task:3"
-git-cliff = "ocx.sh/git-cliff:2"
+bun = "ocx.sh/oven-sh/bun:1"
+nodejs = "ocx.sh/nodejs/node:24"
+go-task = "ocx.sh/go-task/task:3"
+git-cliff = "ocx.sh/git-cliff/git-cliff:2"
 
 [group]
