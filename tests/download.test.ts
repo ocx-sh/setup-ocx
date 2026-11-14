@@ -5,18 +5,15 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { cacheMocks, coreMocks, resetMocks, tcMocks } from "./setup-mocks.js";
 
-// Override constants for download tests so we can drive Windows vs Linux paths
-// without depending on the test host's platform. mock.module against our own
-// src module is acceptable; the testing rule's prohibition is for @actions/*.
-const getTargetMock = mock(() => ({ target: "x86_64-unknown-linux-gnu", isWindows: false }));
-mock.module("../src/constants.js", () => ({
-  getTarget: getTargetMock,
-  getArchiveCandidates: (target: string, isWindows: boolean) =>
-    isWindows ? [`ocx-${target}.zip`] : [`ocx-${target}.tar.gz`, `ocx-${target}.tar.xz`],
-  getDownloadUrl: (version: string, filename: string) =>
-    `https://github.com/ocx-sh/ocx/releases/download/v${version}/${filename}`,
-  detectLibc: () => "gnu" as const,
-}));
+// Drive Windows vs Linux paths by overriding process.platform/arch (restored in
+// afterEach). The real constants module is used so no module mock leaks into
+// constants.test.ts, which bun runs in the same process.
+const realPlatform = Object.getOwnPropertyDescriptor(process, "platform")!;
+const realArch = Object.getOwnPropertyDescriptor(process, "arch")!;
+function setPlatform(platform: string): void {
+  Object.defineProperty(process, "platform", { ...realPlatform, value: platform });
+  Object.defineProperty(process, "arch", { ...realArch, value: "x64" });
+}
 
 const { binaryCacheKey, downloadOcx, findBinDir, saveBinaryCache } =
   await import("../src/download.js");
@@ -32,13 +29,12 @@ function makeTempDir(prefix: string): string {
 
 beforeEach(() => {
   resetMocks();
-  getTargetMock.mockImplementation(() => ({
-    target: "x86_64-unknown-linux-gnu",
-    isWindows: false,
-  }));
+  setPlatform("linux");
 });
 
 afterEach(() => {
+  Object.defineProperty(process, "platform", realPlatform);
+  Object.defineProperty(process, "arch", realArch);
   mock.restore();
 });
 
@@ -119,7 +115,7 @@ describe("downloadOcx", () => {
     tcMocks.find.mockImplementation(() => cacheDir);
 
     try {
-      const result = await downloadOcx("0.2.0", "");
+      const result = await downloadOcx("0.2.0", "", "gnu");
       expect(result.cacheHit).toBe(true);
       expect(result.binDir).toBe(subDir);
       expect(result.version).toBe("0.2.0");
@@ -422,7 +418,7 @@ describe("downloadOcx", () => {
     });
 
     try {
-      await expect(downloadOcx("0.2.0", "")).rejects.toThrow(/SHA256 mismatch/);
+      await expect(downloadOcx("0.2.0", "", "gnu")).rejects.toThrow(/SHA256 mismatch/);
     } finally {
       fs.rmSync(tmpDir, { recursive: true });
     }
@@ -442,7 +438,7 @@ describe("downloadOcx", () => {
     });
 
     try {
-      await expect(downloadOcx("0.2.0", "")).rejects.toThrow(/Empty checksum body/);
+      await expect(downloadOcx("0.2.0", "", "gnu")).rejects.toThrow(/Empty checksum body/);
     } finally {
       fs.rmSync(tmpDir, { recursive: true });
     }
@@ -472,7 +468,7 @@ describe("downloadOcx", () => {
     tcMocks.cacheDir.mockImplementation(() => Promise.resolve(cachedDir));
 
     try {
-      await downloadOcx("0.2.0", "");
+      await downloadOcx("0.2.0", "", "gnu");
       expect(tcMocks.extractTar).toHaveBeenCalledTimes(1);
       const callArgs = tcMocks.extractTar.mock.calls[0];
       expect(callArgs).toBeDefined();
@@ -513,7 +509,7 @@ describe("downloadOcx", () => {
     tcMocks.cacheDir.mockImplementation(() => Promise.resolve(cachedDir));
 
     try {
-      await downloadOcx("0.2.0", "");
+      await downloadOcx("0.2.0", "", "gnu");
       expect(urls.some((u) => u.endsWith(".tar.gz"))).toBe(true);
       expect(urls.some((u) => u.endsWith(".tar.xz"))).toBe(true);
       expect(tcMocks.extractTar).toHaveBeenCalledTimes(1);
@@ -534,16 +530,89 @@ describe("downloadOcx", () => {
       return Promise.reject(Object.assign(new Error("Server Error"), { httpStatusCode: 500 }));
     });
 
-    await expect(downloadOcx("0.2.0", "")).rejects.toThrow(/Server Error/);
+    await expect(downloadOcx("0.2.0", "", "gnu")).rejects.toThrow(/Server Error/);
     expect(urls.some((u) => u.endsWith(".tar.gz"))).toBe(true);
     expect(urls.some((u) => u.endsWith(".tar.xz"))).toBe(false);
   });
 
+  describe("Windows archive candidates", () => {
+    const setup = () => {
+      setPlatform("win32");
+      const tmpDir = makeTempDir("test-download");
+      const archivePath = path.join(tmpDir, "archive.zip");
+      const checksumPath = path.join(tmpDir, "archive.sha256");
+      const extractedDir = makeTempDir("test-extracted");
+      const cachedDir = makeTempDir("test-cached");
+      const content = Buffer.from("content");
+      fs.writeFileSync(archivePath, content);
+      fs.writeFileSync(checksumPath, crypto.createHash("sha256").update(content).digest("hex"));
+      fs.writeFileSync(path.join(extractedDir, "ocx.exe"), "");
+      fs.writeFileSync(path.join(cachedDir, "ocx.exe"), "");
+      tcMocks.extractZip.mockImplementation(() => Promise.resolve(extractedDir));
+      tcMocks.cacheDir.mockImplementation(() => Promise.resolve(cachedDir));
+      const cleanup = () => {
+        for (const d of [tmpDir, extractedDir, cachedDir]) fs.rmSync(d, { recursive: true });
+      };
+      return { archivePath, checksumPath, cleanup };
+    };
+    const notFound = () =>
+      Promise.reject(Object.assign(new Error("Not Found"), { httpStatusCode: 404 }));
+
+    test("uses gnullvm when present and takes its checksum", async () => {
+      const { archivePath, checksumPath, cleanup } = setup();
+      const urls: string[] = [];
+      tcMocks.downloadTool.mockImplementation((url: string) => {
+        urls.push(url);
+        return Promise.resolve(url.endsWith(".sha256") ? checksumPath : archivePath);
+      });
+      try {
+        await downloadOcx("0.2.0", "", "gnu");
+        expect(urls).toHaveLength(2);
+        expect(urls[0]).toEndWith("/ocx-x86_64-pc-windows-gnullvm.zip");
+        expect(urls[1]).toEndWith("/ocx-x86_64-pc-windows-gnullvm.zip.sha256");
+      } finally {
+        cleanup();
+      }
+    });
+
+    test("falls back to msvc when gnullvm 404s and takes the msvc checksum", async () => {
+      const { archivePath, checksumPath, cleanup } = setup();
+      const urls: string[] = [];
+      tcMocks.downloadTool.mockImplementation((url: string) => {
+        urls.push(url);
+        if (url.includes("gnullvm")) return notFound();
+        return Promise.resolve(url.endsWith(".sha256") ? checksumPath : archivePath);
+      });
+      try {
+        await downloadOcx("0.2.0", "", "gnu");
+        expect(urls).toHaveLength(3);
+        expect(urls[1]).toEndWith("/ocx-x86_64-pc-windows-msvc.zip");
+        expect(urls[2]).toEndWith("/ocx-x86_64-pc-windows-msvc.zip.sha256");
+        expect(tcMocks.extractZip).toHaveBeenCalledWith(archivePath);
+      } finally {
+        cleanup();
+      }
+    });
+
+    test("does not fall through on a non-404 error from gnullvm", async () => {
+      const { cleanup } = setup();
+      const urls: string[] = [];
+      tcMocks.downloadTool.mockImplementation((url: string) => {
+        urls.push(url);
+        return Promise.reject(Object.assign(new Error("Server Error"), { httpStatusCode: 500 }));
+      });
+      try {
+        await expect(downloadOcx("0.2.0", "", "gnu")).rejects.toThrow(/Server Error/);
+        expect(urls).toHaveLength(1);
+        expect(urls[0]).toContain("gnullvm");
+      } finally {
+        cleanup();
+      }
+    });
+  });
+
   test("uses extractZip for Windows .zip archives", async () => {
-    getTargetMock.mockImplementation(() => ({
-      target: "x86_64-pc-windows-msvc",
-      isWindows: true,
-    }));
+    setPlatform("win32");
 
     const tmpDir = makeTempDir("test-download");
     const archivePath = path.join(tmpDir, "archive.zip");
@@ -568,7 +637,7 @@ describe("downloadOcx", () => {
     tcMocks.cacheDir.mockImplementation(() => Promise.resolve(cachedDir));
 
     try {
-      await downloadOcx("0.2.0", "");
+      await downloadOcx("0.2.0", "", "gnu");
       expect(tcMocks.extractZip).toHaveBeenCalledTimes(1);
       expect(tcMocks.extractZip).toHaveBeenCalledWith(archivePath);
       expect(tcMocks.extractTar).not.toHaveBeenCalled();
