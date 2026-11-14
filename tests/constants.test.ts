@@ -193,9 +193,17 @@ describe("getArchiveCandidates", () => {
     ]);
   });
 
-  test("windows has a single .zip candidate", () => {
+  test("windows x64 prefers gnullvm .zip then falls back to msvc", () => {
     expect(getArchiveCandidates("x86_64-pc-windows-msvc", true)).toEqual([
+      "ocx-x86_64-pc-windows-gnullvm.zip",
       "ocx-x86_64-pc-windows-msvc.zip",
+    ]);
+  });
+
+  test("windows arm64 prefers gnullvm .zip then falls back to msvc", () => {
+    expect(getArchiveCandidates("aarch64-pc-windows-msvc", true)).toEqual([
+      "ocx-aarch64-pc-windows-gnullvm.zip",
+      "ocx-aarch64-pc-windows-msvc.zip",
     ]);
   });
 });

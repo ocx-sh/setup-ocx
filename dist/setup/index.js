@@ -105351,7 +105351,9 @@ function guardWindowsProcessTitle(platform2 = process.platform, uv = process.ver
   }
 }
 function getArchiveCandidates(target, isWindows) {
-  if (isWindows) return [`ocx-${target}.zip`];
+  if (isWindows) {
+    return [`ocx-${target.replace(/-msvc$/, "-gnullvm")}.zip`, `ocx-${target}.zip`];
+  }
   return [`ocx-${target}.tar.gz`, `ocx-${target}.tar.xz`];
 }
 function getDownloadUrl(version2, filename) {

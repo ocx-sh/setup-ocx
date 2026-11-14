@@ -133,10 +133,13 @@ export function guardWindowsProcessTitle(
 
 /**
  * Ordered archive-name candidates to try. Non-Windows: new `.tar.gz` first,
- * legacy `.tar.xz` fallback. Windows: single `.zip`.
+ * legacy `.tar.xz` fallback. Windows: `gnullvm` `.zip` first, legacy `msvc`
+ * `.zip` fallback (releases before the rename only carry msvc).
  */
 export function getArchiveCandidates(target: string, isWindows: boolean): readonly string[] {
-  if (isWindows) return [`ocx-${target}.zip`];
+  if (isWindows) {
+    return [`ocx-${target.replace(/-msvc$/, "-gnullvm")}.zip`, `ocx-${target}.zip`];
+  }
   return [`ocx-${target}.tar.gz`, `ocx-${target}.tar.xz`];
 }
 
