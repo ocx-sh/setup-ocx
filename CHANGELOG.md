@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.1](https://github.com/ocx-sh/setup-ocx/releases/tag/v1.4.1) — 2026-11-15
+
+### Fixed
+
+- Windows downloads the gnullvm archive and falls back to msvc by @michael-herwig ([ba0ef2a](https://github.com/ocx-sh/setup-ocx/commit/ba0ef2a4827273b1f0f345968fb8c02790ce6761))
 ## [1.4.0](https://github.com/ocx-sh/setup-ocx/releases/tag/v1.4.0) — 2026-08-07
 
 ### Added
@@ -11,6 +16,10 @@ All notable changes to this project will be documented in this file.
 ### Documentation
 
 - Document the managed-config input and adoption behavior by @michael-herwig ([10ba6d8](https://github.com/ocx-sh/setup-ocx/commit/10ba6d836b1dd8d462848a38878714d382e57d8b))
+
+### Release
+
+- V1.4.0 by @michael-herwig ([25fa771](https://github.com/ocx-sh/setup-ocx/commit/25fa771f8572572dc64528db89560de68a163a0e))
 ## [1.3.0](https://github.com/ocx-sh/setup-ocx/releases/tag/v1.3.0) — 2026-07-11
 
 ### Added
